@@ -16,25 +16,17 @@ interface Incident {
 }
 
 export default function App() {
-  const [targetUrl, setTargetUrl] = useState(
-    () => localStorage.getItem("kpi_target_url") || ""
-  );
-  const [cookie, setCookie] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  // Simpan URL tujuan di browser agar tidak perlu ketik ulang
-  useEffect(() => {
-    localStorage.setItem("kpi_target_url", targetUrl);
-  }, [targetUrl]);
+  // Otomatis membangun script Bookmarklet sesuai URL live domain ini
+  const apiIngestUrl = `${window.location.origin}/api/ingest`;
+  const bookmarkletCode = `javascript:(async()=>{const t=document.querySelector('table');if(!t)return alert('Tabel tidak ditemukan di halaman ini!');const h=[...t.querySelectorAll('thead th, tr:first-child th')].map(e=>e.innerText.replace(/\\s+/g,' ').trim().toUpperCase());const rows=[...t.querySelectorAll('tbody tr')].map(tr=>{const td=[...tr.querySelectorAll('td')];const o={};h.forEach((k,i)=>{if(k&&td[i])o[k]=td[i].innerText.replace(/\\s+/g,' ').trim()});return o}).filter(r=>r.INCIDENT&&r.INCIDENT.startsWith('INC'));if(!rows.length)return alert('Tidak ada baris tiket INC ditemukan.');try{const res=await fetch('${apiIngestUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});const j=await res.json();alert(j.message||j.error)}catch(e){alert('Gagal mengirim data: '+e.message)}})();`;
 
-  // Muat data dari database D1 saat halaman pertama kali dibuka
   const fetchIncidents = async () => {
+    setLoading(true);
     try {
       const res = await fetch("/api/incidents");
       const json = await res.json();
@@ -43,6 +35,8 @@ export default function App() {
       }
     } catch (err) {
       console.error("Gagal memuat data:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,31 +44,10 @@ export default function App() {
     fetchIncidents();
   }, []);
 
-  // Eksekusi penarikan data ke backend Worker
-  const handleSync = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setStatusMsg(null);
-
-    try {
-      const res = await fetch("/api/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUrl, cookie }),
-      });
-      const json = await res.json();
-
-      if (!res.ok) {
-        setStatusMsg({ type: "error", text: json.error || "Terjadi kesalahan." });
-      } else {
-        setStatusMsg({ type: "success", text: json.message });
-        await fetchIncidents(); // Refresh tabel otomatis
-      }
-    } catch (err: any) {
-      setStatusMsg({ type: "error", text: err.message });
-    } finally {
-      setLoading(false);
-    }
+  const handleCopyBookmarklet = () => {
+    navigator.clipboard.writeText(bookmarkletCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
   };
 
   const filteredData = incidents.filter(
@@ -82,7 +55,8 @@ export default function App() {
       item.incident.toLowerCase().includes(search.toLowerCase()) ||
       (item.workzone || "").toLowerCase().includes(search.toLowerCase()) ||
       (item.witel || "").toLowerCase().includes(search.toLowerCase()) ||
-      (item.status || "").toLowerCase().includes(search.toLowerCase())
+      (item.status || "").toLowerCase().includes(search.toLowerCase()) ||
+      (item.technician || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -91,109 +65,100 @@ export default function App() {
         Dashboard Performansi & Sync Tiket Incident
       </h1>
       <p style={{ color: "#555", marginBottom: "24px" }}>
-        Masukkan Link Tujuan dan Cookie sesi aktif untuk menyinkronkan tabel HTML langsung ke database.
+        Sinkronisasi otomatis tabel tiket langsung dari browser aktif ke database Cloudflare D1 tanpa copy-paste Excel.
       </p>
 
-      {/* FORM INPUT COOKIE & URL */}
-      <form
-        onSubmit={handleSync}
+      {/* PANEL PANDUAN & GENERATOR BOOKMARKLET 1-KLIK */}
+      <div
         style={{
           background: "#f8fafc",
-          border: "1px solid #e2e8f0",
+          border: "1px solid #cbd5e1",
           borderRadius: "8px",
           padding: "20px",
           marginBottom: "24px",
         }}
       >
-        <div style={{ marginBottom: "14px" }}>
-          <label style={{ display: "block", fontWeight: 600, marginBottom: "6px" }}>
-            1. Link URL Tabel Tujuan (Tersimpan Otomatis)
-          </label>
-          <input
-            type="url"
-            required
-            placeholder="https://..."
-            value={targetUrl}
-            onChange={(e) => setTargetUrl(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              borderRadius: "6px",
-              border: "1px solid #cbd5e1",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
+        <h2 style={{ fontSize: "16px", fontWeight: 700, marginTop: 0, marginBottom: "10px" }}>
+          Pengaturan Bookmarklet Penarik Data (Cukup Setup 1 Kali)
+        </h2>
+        <ol style={{ margin: "0 0 14px 20px", padding: 0, fontSize: "14px", lineHeight: "1.6", color: "#334155" }}>
+          <li>Klik tombol <strong>Copy Kode Bookmarklet</strong> di bawah ini.</li>
+          <li>Munculkan Bookmarks Bar di Chrome (<code>Ctrl + Shift + B</code> atau <code>Cmd + Shift + B</code>).</li>
+          <li>Klik kanan pada Bookmarks Bar → pilih <strong>Add page...</strong> (Tambah halaman).</li>
+          <li>Isi Name: <code>Kirim ke Dashboard KPI</code>, lalu tempel kode yang sudah di-copy ke kolom <strong>URL</strong> → klik Save.</li>
+          <li>Buka portal tiket yang sudah login, lalu klik bookmark tersebut untuk mengirim 100 baris tabel ke database ini.</li>
+        </ol>
 
-        <div style={{ marginBottom: "16px" }}>
-          <label style={{ display: "block", fontWeight: 600, marginBottom: "6px" }}>
-            2. Session Cookie Aktif (Salin dari DevTools → Network → Request Headers → Cookie)
-          </label>
-          <textarea
-            required
-            rows={3}
-            placeholder="Tempel string Cookie di sini..."
-            value={cookie}
-            onChange={(e) => setCookie(e.target.value)}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <input
+            type="text"
+            readOnly
+            value={bookmarkletCode}
             style={{
-              width: "100%",
-              padding: "10px",
+              flex: 1,
+              padding: "9px 12px",
               borderRadius: "6px",
               border: "1px solid #cbd5e1",
               fontFamily: "monospace",
               fontSize: "12px",
-              boxSizing: "border-box",
+              background: "#fff",
+              color: "#475569",
             }}
           />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            background: loading ? "#94a3b8" : "#2563eb",
-            color: "#fff",
-            border: "none",
-            padding: "10px 20px",
-            borderRadius: "6px",
-            fontWeight: 600,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Sedang Menarik & Menyimpan Data..." : "Tarik Data & Simpan ke Database"}
-        </button>
-
-        {statusMsg && (
-          <div
+          <button
+            type="button"
+            onClick={handleCopyBookmarklet}
             style={{
-              marginTop: "14px",
-              padding: "12px",
+              background: copied ? "#16a34a" : "#2563eb",
+              color: "#fff",
+              border: "none",
+              padding: "10px 18px",
               borderRadius: "6px",
-              background: statusMsg.type === "success" ? "#dcfce7" : "#fee2e2",
-              color: statusMsg.type === "success" ? "#166534" : "#991b1b",
-              fontWeight: 500,
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
             }}
           >
-            {statusMsg.text}
-          </div>
-        )}
-      </form>
-
-      {/* RINGKASAN DATA & FILTER */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-        <div style={{ fontWeight: 600 }}>
-          Total Data di Database: <span style={{ color: "#2563eb" }}>{incidents.length} Tiket</span>
+            {copied ? "Tersalin!" : "Copy Kode Bookmarklet"}
+          </button>
         </div>
+      </div>
+
+      {/* BARIS KONTROL TABEL & REFRESH */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ fontWeight: 600 }}>
+            Total Data di Database: <span style={{ color: "#2563eb" }}>{incidents.length} Tiket</span>
+          </span>
+          <button
+            type="button"
+            onClick={fetchIncidents}
+            disabled={loading}
+            style={{
+              background: "#0f172a",
+              color: "#fff",
+              border: "none",
+              padding: "7px 14px",
+              borderRadius: "6px",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            {loading ? "Memuat..." : "Refresh Data"}
+          </button>
+        </div>
+
         <input
           type="text"
-          placeholder="Cari INCIDENT / WITEL / WORKZONE / STATUS..."
+          placeholder="Cari INCIDENT / WITEL / WORKZONE / STATUS / TEKNISI..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
             padding: "8px 12px",
             borderRadius: "6px",
             border: "1px solid #cbd5e1",
-            width: "320px",
+            width: "350px",
           }}
         />
       </div>
@@ -219,7 +184,7 @@ export default function App() {
             {filteredData.length === 0 ? (
               <tr>
                 <td colSpan={10} style={{ padding: "20px", textAlign: "center", color: "#64748b" }}>
-                  Belum ada data tiket di database. Silakan masukkan URL & Cookie di atas.
+                  Belum ada data tiket di database. Gunakan Bookmarklet di portal tiket lalu klik Refresh Data.
                 </td>
               </tr>
             ) : (

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 
 type Bindings = {
   DB: D1Database;
@@ -6,118 +7,37 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// Helper: Membersihkan spasi berlebih & karakter non-printable dari teks HTML
-function cleanText(str: string): string {
-  return str.replace(/\s+/g, " ").trim();
-}
+// Aktifkan CORS agar browser dari portal sumber diizinkan mengirim data ke API ini
+app.use(
+  "/api/*",
+  cors({
+    origin: "*",
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowHeaders: ["Content-Type"],
+  })
+);
 
-// Helper: Parsing HTML Table secara streaming menggunakan HTMLRewriter bawaan Cloudflare
-async function parseHtmlTable(htmlResponse: Response): Promise<Record<string, string>[]> {
-  const rows: string[][] = [];
-  let currentRow: string[] = [];
-  let currentCell = "";
-  let inCell = false;
-
-  const rewriter = new HTMLRewriter()
-    .on("table tr", {
-      element() {
-        currentRow = [];
-      },
-      comments() {},
-      text() {},
-    })
-    .on("table tr th, table tr td", {
-      element(el) {
-        inCell = true;
-        currentCell = "";
-        el.onEndTag(() => {
-          inCell = false;
-          currentRow.push(cleanText(currentCell));
-        });
-      },
-      text(chunk) {
-        if (inCell) {
-          currentCell += chunk.text;
-        }
-      },
-    })
-    .on("table tr", {
-      element(el) {
-        el.onEndTag(() => {
-          if (currentRow.length > 0) {
-            rows.push(currentRow);
-          }
-        });
-      },
-    });
-
-  // Eksekusi streaming HTMLRewriter
-  await rewriter.transform(htmlResponse).text();
-
-  if (rows.length < 2) return [];
-
-  // Baris pertama dianggap sebagai Header Kolom
-  const headers = rows[0].map((h) => h.toUpperCase());
-  const dataRows = rows.slice(1);
-
-  return dataRows
-    .map((cells) => {
-      const obj: Record<string, string> = {};
-      headers.forEach((header, idx) => {
-        if (header) {
-          obj[header] = cells[idx] ?? "";
-        }
-      });
-      return obj;
-    })
-    // Filter hanya baris yang memiliki nomor tiket INCIDENT valid
-    .filter((item) => item["INCIDENT"] && item["INCIDENT"].startsWith("INC"));
-}
-
-// ENDPOINT 1: Tarik data dari URL Eksternal pakai Cookie & Simpan ke D1
-app.post("/api/sync", async (c) => {
+// ENDPOINT 1: Menerima data JSON hasil parsing langsung dari Bookmarklet browser
+app.post("/api/ingest", async (c) => {
   try {
     const body = await c.req.json();
-    const cookie = (body.cookie || "").trim();
-    const targetUrl = (body.targetUrl || "").trim();
+    const parsedRows: Record<string, string>[] = body.rows || [];
 
-    if (!cookie || !targetUrl) {
-      return c.json({ error: "Cookie sesi aktif dan Link Tujuan wajib diisi." }, 400);
+    if (!Array.isArray(parsedRows) || parsedRows.length === 0) {
+      return c.json({ error: "Tidak ada data tiket yang dikirim." }, 400);
     }
 
-    // Request ke web tujuan menggunakan cookie dari user
-    const targetRes = await fetch(targetUrl, {
-      method: "GET",
-      headers: {
-        Cookie: cookie,
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-      redirect: "follow",
-    });
+    const validRows = parsedRows.filter(
+      (r) => r["INCIDENT"] && r["INCIDENT"].startsWith("INC")
+    );
 
-    if (!targetRes.ok) {
+    if (validRows.length === 0) {
       return c.json(
-        { error: `Gagal mengakses link tujuan (HTTP Status: ${targetRes.status}).` },
-        targetRes.status as any
+        { error: "Format kolom tidak sesuai atau tidak ditemukan tiket INC." },
+        400
       );
     }
 
-    // Parse HTML menjadi array objek berdasarkan nama header kolom
-    const parsedRows = await parseHtmlTable(targetRes);
-
-    if (parsedRows.length === 0) {
-      return c.json(
-        {
-          error:
-            "Tidak ditemukan baris data tiket (INC...) pada HTML. Kemungkinan Cookie sudah expired (ter-redirect ke halaman login) atau URL salah.",
-        },
-        401
-      );
-    }
-
-    // Siapkan Batch UPSERT ke Cloudflare D1 (anti-duplikat berdasarkan INCIDENT)
     const stmt = c.env.DB.prepare(`
       INSERT INTO incidents (
         incident, ttr_customer, summary, reported_date, owner_group, owner,
@@ -156,7 +76,7 @@ app.post("/api/sync", async (c) => {
         synced_at = datetime('now')
     `);
 
-    const batch = parsedRows.map((r) =>
+    const batch = validRows.map((r) =>
       stmt.bind(
         r["INCIDENT"] || "",
         r["TTR CUSTOMER"] || "",
@@ -207,18 +127,18 @@ app.post("/api/sync", async (c) => {
       )
     );
 
-    // Eksekusi dalam potongan 50 baris per batch agar aman dari limit SQLite parameter
+    // Eksekusi per 50 baris untuk menjaga batas parameter SQLite D1
     for (let i = 0; i < batch.length; i += 50) {
       await c.env.DB.batch(batch.slice(i, i + 50));
     }
 
     return c.json({
       success: true,
-      syncedCount: parsedRows.length,
-      message: `Berhasil menyinkronkan ${parsedRows.length} tiket ke database D1.`,
+      syncedCount: validRows.length,
+      message: `Sukses! ${validRows.length} tiket berhasil disimpan/diperbarui ke database D1.`,
     });
   } catch (err: any) {
-    return c.json({ error: `Server Error: ${err.message}` }, 500);
+    return c.json({ error: `Ingest Error: ${err.message}` }, 500);
   }
 });
 

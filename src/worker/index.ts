@@ -7,7 +7,6 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// Aktifkan CORS agar browser dari portal sumber diizinkan mengirim data ke API ini
 app.use(
   "/api/*",
   cors({
@@ -17,7 +16,7 @@ app.use(
   })
 );
 
-// ENDPOINT 1: Menerima data JSON hasil parsing langsung dari Bookmarklet browser
+// ENDPOINT 1: Menerima data JSON hasil parsing dari Bookmarklet browser
 app.post("/api/ingest", async (c) => {
   try {
     const body = await c.req.json();
@@ -40,94 +39,73 @@ app.post("/api/ingest", async (c) => {
 
     const stmt = c.env.DB.prepare(`
       INSERT INTO incidents (
-        incident, ttr_customer, summary, reported_date, owner_group, owner,
-        customer_segment, service_type, witel, workzone, status,
-        contact_phone, contact_name, description_assignment, source_ticket,
-        external_ticket_id, customer_type, customer_id, service_id, service_no,
-        technology, lapul, gaul, onu_rx, datemodified, region, symptom,
-        technician, device_name, classification_flag, related_to_gamas,
-        ttr_agent, ttr_mitra, ttr_nasional, ttr_pending, ttr_region,
-        ttr_witel, ttr_end_to_end, guarantee_status, resolve_date,
-        sn_ont, tipe_ont, rk_information, external_ticket_tier_3,
-        classification_path, urgency_description, synced_at
+        incident, reported_date, service_type, witel, workzone,
+        status, status_date, ticket_id_gamas, contact_phone, contact_name,
+        customer_type, customer_name, service_no, symptom,
+        summary, owner_group, owner, customer_segment, lapul, gaul,
+        onu_rx, datemodified, technician, ttr_end_to_end, synced_at
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, datetime('now')
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, datetime('now')
       )
       ON CONFLICT(incident) DO UPDATE SET
-        ttr_customer = excluded.ttr_customer,
+        reported_date = excluded.reported_date,
+        service_type = excluded.service_type,
+        witel = excluded.witel,
+        workzone = excluded.workzone,
         status = excluded.status,
+        status_date = excluded.status_date,
+        ticket_id_gamas = excluded.ticket_id_gamas,
+        contact_phone = excluded.contact_phone,
+        contact_name = excluded.contact_name,
+        customer_type = excluded.customer_type,
+        customer_name = excluded.customer_name,
+        service_no = excluded.service_no,
+        symptom = excluded.symptom,
+        summary = excluded.summary,
         owner_group = excluded.owner_group,
         owner = excluded.owner,
-        technician = excluded.technician,
         lapul = excluded.lapul,
         gaul = excluded.gaul,
         onu_rx = excluded.onu_rx,
         datemodified = excluded.datemodified,
-        ttr_agent = excluded.ttr_agent,
-        ttr_mitra = excluded.ttr_mitra,
-        ttr_nasional = excluded.ttr_nasional,
-        ttr_pending = excluded.ttr_pending,
-        ttr_region = excluded.ttr_region,
-        ttr_witel = excluded.ttr_witel,
+        technician = excluded.technician,
         ttr_end_to_end = excluded.ttr_end_to_end,
-        resolve_date = excluded.resolve_date,
         synced_at = datetime('now')
     `);
 
     const batch = validRows.map((r) =>
       stmt.bind(
         r["INCIDENT"] || "",
-        r["TTR CUSTOMER"] || "",
-        r["SUMMARY"] || "",
         r["REPORTED DATE"] || "",
-        r["OWNER GROUP"] || "",
-        r["OWNER"] || "",
-        r["CUSTOMER SEGMENT"] || "",
         r["SERVICE TYPE"] || "",
         r["WITEL"] || "",
         r["WORKZONE"] || "",
         r["STATUS"] || "",
+        r["STATUS DATE"] || r["DATEMODIFIED"] || "",
+        r["TICKET ID GAMAS"] || r["EXTERNAL TICKET ID"] || r["EXTERNAL TICKET TIER 3"] || "",
         r["CONTACT PHONE"] || "",
         r["CONTACT NAME"] || "",
-        r["DESCRIPTION ASSIGMENT"] || r["DESCRIPTION ASSIGNMENT"] || "",
-        r["SOURCE TICKET"] || "",
-        r["EXTERNAL TICKET ID"] || "",
         r["CUSTOMER TYPE"] || "",
-        r["CUSTOMER ID"] || "",
-        r["SERVICE ID"] || "",
+        r["CUSTOMER NAME"] || "",
         r["SERVICE NO"] || "",
-        r["TECHNOLOGY"] || "",
+        r["SYMPTOM"] || "",
+        r["SUMMARY"] || "",
+        r["OWNER GROUP"] || "",
+        r["OWNER"] || "",
+        r["CUSTOMER SEGMENT"] || "",
         parseInt(r["LAPUL"] || "0", 10) || 0,
         parseInt(r["GAUL"] || "0", 10) || 0,
         r["ONU RX"] || "",
         r["DATEMODIFIED"] || "",
-        r["REGION"] || "",
-        r["SYMPTOM"] || "",
         r["TECHNICIAN"] || "",
-        r["DEVICE NAME"] || "",
-        r["CLASSIFICATION FLAG"] || "",
-        r["RELATED TO GAMAS"] || "",
-        r["TTR AGENT"] || "",
-        r["TTR MITRA"] || "",
-        r["TTR NASIONAL"] || "",
-        r["TTR PENDING"] || "",
-        r["TTR REGION"] || "",
-        r["TTR WITEL"] || "",
-        r["TTR END TO END"] || "",
-        r["GUARANTE STATUS"] || r["GUARANTEE STATUS"] || "",
-        r["RESOLVE DATE"] || "",
-        r["SN ONT"] || "",
-        r["TIPE ONT"] || "",
-        r["RK INFORMATION"] || "",
-        r["EXTERNAL TICKET TIER 3"] || "",
-        r["CLASSIFICATION PATH"] || "",
-        r["URGENCY DESCRIPTION"] || ""
+        r["TTR END TO END"] || ""
       )
     );
 
-    // Eksekusi per 50 baris untuk menjaga batas parameter SQLite D1
     for (let i = 0; i < batch.length; i += 50) {
       await c.env.DB.batch(batch.slice(i, i + 50));
     }
@@ -142,7 +120,7 @@ app.post("/api/ingest", async (c) => {
   }
 });
 
-// ENDPOINT 2: Ambil seluruh data dari Database D1 untuk ditampilkan & diolah di Dashboard
+// ENDPOINT 2: Ambil seluruh data dari Database D1
 app.get("/api/incidents", async (c) => {
   try {
     const { results } = await c.env.DB.prepare(

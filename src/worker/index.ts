@@ -16,7 +16,7 @@ app.use(
   })
 );
 
-// ENDPOINT 1: Menerima data JSON hasil parsing dari Bookmarklet browser
+// ENDPOINT 1: Mode Mirroring - Kosongkan data lama & simpan murni data terbaru dari Bookmarklet
 app.post("/api/ingest", async (c) => {
   try {
     const body = await c.req.json();
@@ -37,7 +37,11 @@ app.post("/api/ingest", async (c) => {
       );
     }
 
-    const stmt = c.env.DB.prepare(`
+    // 1. Siapkan statement penghapusan seluruh data lama
+    const deleteStmt = c.env.DB.prepare("DELETE FROM incidents");
+
+    // 2. Siapkan statement insert data terbaru
+    const insertStmt = c.env.DB.prepare(`
       INSERT INTO incidents (
         incident, reported_date, service_type, witel, workzone,
         status, status_date, ticket_id_gamas, contact_phone, contact_name,
@@ -51,34 +55,10 @@ app.post("/api/ingest", async (c) => {
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, datetime('now')
       )
-      ON CONFLICT(incident) DO UPDATE SET
-        reported_date = excluded.reported_date,
-        service_type = excluded.service_type,
-        witel = excluded.witel,
-        workzone = excluded.workzone,
-        status = excluded.status,
-        status_date = excluded.status_date,
-        ticket_id_gamas = excluded.ticket_id_gamas,
-        contact_phone = excluded.contact_phone,
-        contact_name = excluded.contact_name,
-        customer_type = excluded.customer_type,
-        customer_name = excluded.customer_name,
-        service_no = excluded.service_no,
-        symptom = excluded.symptom,
-        summary = excluded.summary,
-        owner_group = excluded.owner_group,
-        owner = excluded.owner,
-        lapul = excluded.lapul,
-        gaul = excluded.gaul,
-        onu_rx = excluded.onu_rx,
-        datemodified = excluded.datemodified,
-        technician = excluded.technician,
-        ttr_end_to_end = excluded.ttr_end_to_end,
-        synced_at = datetime('now')
     `);
 
-    const batch = validRows.map((r) =>
-      stmt.bind(
+    const insertBatch = validRows.map((r) =>
+      insertStmt.bind(
         r["INCIDENT"] || "",
         r["REPORTED DATE"] || "",
         r["SERVICE TYPE"] || "",
@@ -106,14 +86,18 @@ app.post("/api/ingest", async (c) => {
       )
     );
 
-    for (let i = 0; i < batch.length; i += 50) {
-      await c.env.DB.batch(batch.slice(i, i + 50));
+    // Eksekusi batch pertama berisi DELETE + 50 baris pertama secara atomik
+    await c.env.DB.batch([deleteStmt, ...insertBatch.slice(0, 50)]);
+
+    // Jika tiket lebih dari 50 baris, masukkan sisa barisnya per 50 baris
+    for (let i = 50; i < insertBatch.length; i += 50) {
+      await c.env.DB.batch(insertBatch.slice(i, i + 50));
     }
 
     return c.json({
       success: true,
       syncedCount: validRows.length,
-      message: `Sukses! ${validRows.length} tiket berhasil disimpan/diperbarui ke database D1.`,
+      message: `Sukses! Data lama dibersihkan & diganti dengan ${validRows.length} tiket terbaru.`,
     });
   } catch (err: any) {
     return c.json({ error: `Ingest Error: ${err.message}` }, 500);

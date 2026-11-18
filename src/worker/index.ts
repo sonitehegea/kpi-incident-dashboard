@@ -57,8 +57,12 @@ app.post("/api/ingest", async (c) => {
       )
     `);
 
-    const insertBatch = validRows.map((r) =>
-      insertStmt.bind(
+    const insertBatch = validRows.map((r) => {
+      // Ambil murni dari kolom TICKET ID GAMAS; jika blank/kosong, isi dengan "-"
+      const rawGamas = (r["TICKET ID GAMAS"] || "").trim();
+      const ticketIdGamas = rawGamas !== "" ? rawGamas : "-";
+
+      return insertStmt.bind(
         r["INCIDENT"] || "",
         r["REPORTED DATE"] || "",
         r["SERVICE TYPE"] || "",
@@ -66,7 +70,7 @@ app.post("/api/ingest", async (c) => {
         r["WORKZONE"] || "",
         r["STATUS"] || "",
         r["STATUS DATE"] || r["DATEMODIFIED"] || "",
-        r["TICKET ID GAMAS"] || r["EXTERNAL TICKET ID"] || r["EXTERNAL TICKET TIER 3"] || "",
+        ticketIdGamas,
         r["CONTACT PHONE"] || "",
         r["CONTACT NAME"] || "",
         r["CUSTOMER TYPE"] || "",
@@ -83,8 +87,8 @@ app.post("/api/ingest", async (c) => {
         r["DATEMODIFIED"] || "",
         r["TECHNICIAN"] || "",
         r["TTR END TO END"] || ""
-      )
-    );
+      );
+    });
 
     // Eksekusi batch pertama berisi DELETE + 50 baris pertama secara atomik
     await c.env.DB.batch([deleteStmt, ...insertBatch.slice(0, 50)]);

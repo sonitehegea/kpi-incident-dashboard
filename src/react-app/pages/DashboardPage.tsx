@@ -175,7 +175,6 @@ export default function DashboardPage({
       colTotals[seg] = (colTotals[seg] || 0) + 1;
     });
 
-    // Pertahankan urutan Workzone sesuai daftar baku, lalu tambahkan STO ekstra jika ada
     const extraWorkzones = Object.keys(wzMap).filter(
       (wz) => !standardWorkzones.includes(wz)
     );
@@ -255,7 +254,7 @@ export default function DashboardPage({
   const handleExportCsv = () => {
     if (!filteredData.length) return;
     const headers = [
-      "INCIDENT", "REPORTED DATE", "SERVICE TYPE", "WITEL", "WORKZONE",
+      "INCIDENT", "REPORTED DATE", "BOOKING DATE", "SERVICE TYPE", "WITEL", "WORKZONE",
       "STATUS", "STATUS DATE", "TICKET ID GAMAS", "CONTACT PHONE",
       "CONTACT NAME", "CUSTOMER TYPE", "CUSTOMER NAME", "SERVICE NO", "SYMPTOM",
     ];
@@ -263,7 +262,7 @@ export default function DashboardPage({
       headers.join(","),
       ...filteredData.map((r) =>
         [
-          r.incident, r.reported_date, r.service_type, r.witel, r.workzone,
+          r.incident, r.reported_date, r.booking_date, r.service_type, r.witel, r.workzone,
           r.status, r.status_date, r.ticket_id_gamas, r.contact_phone,
           r.contact_name, r.customer_type, r.customer_name, r.service_no, r.symptom,
         ]
@@ -413,7 +412,6 @@ export default function DashboardPage({
                           fontSize: "12.5px",
                           textAlign: "center",
                           fontWeight: 700,
-                          // Angka 0 ditandai warna hijau (#16a34a), selain 0 warna gelap (#1e293b)
                           color: val === 0 ? "#16a34a" : "#1e293b",
                         }}
                       >
@@ -879,7 +877,7 @@ export default function DashboardPage({
         {renderMatrixCard("REKAP TIKET WITEL JAKBAR (WORKZONE × SEGMEN)", "JAKBAR", jakbarMatrix)}
       </div>
 
-      {/* TABEL DETAIL 14 KOLOM (DRILL-DOWN) */}
+      {/* TABEL DETAIL 15 KOLOM (DRILL-DOWN) */}
       <div
         style={{
           background: "#ffffff",
@@ -993,6 +991,7 @@ export default function DashboardPage({
               <tr>
                 <th style={thStyle}>INCIDENT</th>
                 <th style={thStyle}>REPORTED DATE</th>
+                <th style={thStyle}>BOOKING DATE</th>
                 <th style={thStyle}>SERVICE TYPE</th>
                 <th style={thStyle}>WITEL</th>
                 <th style={thStyle}>WORKZONE</th>
@@ -1010,7 +1009,7 @@ export default function DashboardPage({
             <tbody>
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={14} style={{ padding: "24px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
+                  <td colSpan={15} style={{ padding: "24px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
                     Tidak ada data tiket yang sesuai dengan filter saat ini.
                   </td>
                 </tr>
@@ -1019,6 +1018,7 @@ export default function DashboardPage({
                   <tr key={row.incident} className="detail-row" style={{ borderBottom: "1px solid #e2e8f0" }}>
                     <td style={{ ...tdStyle, fontWeight: 700, color: "#1d4ed8" }}>{row.incident}</td>
                     <td style={tdStyle}>{row.reported_date || "-"}</td>
+                    <td style={tdStyle}>{row.booking_date || "-"}</td>
                     <td style={tdStyle}>{row.service_type || "-"}</td>
                     <td style={tdStyle}>{row.witel || "-"}</td>
                     <td style={{ ...tdStyle, fontWeight: 600 }}>{row.workzone || "-"}</td>

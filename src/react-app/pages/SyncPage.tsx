@@ -198,6 +198,7 @@ export default function SyncPage({
               <tr>
                 <th style={thStyle}>INCIDENT</th>
                 <th style={thStyle}>REPORTED DATE</th>
+                <th style={thStyle}>BOOKING DATE</th>
                 <th style={thStyle}>SERVICE TYPE</th>
                 <th style={thStyle}>WITEL</th>
                 <th style={thStyle}>WORKZONE</th>
@@ -215,7 +216,7 @@ export default function SyncPage({
             <tbody>
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={14} style={{ padding: "24px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
+                  <td colSpan={15} style={{ padding: "24px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
                     Belum ada data tiket di database. Jalankan Bookmarklet dari portal sumber lalu klik Cek & Refresh Data.
                   </td>
                 </tr>
@@ -224,6 +225,7 @@ export default function SyncPage({
                   <tr key={row.incident} style={{ borderBottom: "1px solid #e2e8f0" }}>
                     <td style={{ ...tdStyle, fontWeight: 700, color: "#1d4ed8" }}>{row.incident}</td>
                     <td style={tdStyle}>{row.reported_date || "-"}</td>
+                    <td style={tdStyle}>{row.booking_date || "-"}</td>
                     <td style={tdStyle}>{row.service_type || "-"}</td>
                     <td style={tdStyle}>{row.witel || "-"}</td>
                     <td style={tdStyle}>{row.workzone || "-"}</td>

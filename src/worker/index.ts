@@ -16,11 +16,14 @@ app.use(
   })
 );
 
-// ENDPOINT 1: Mode Mirroring - Kosongkan data lama & simpan murni data terbaru dari Bookmarklet
+// ENDPOINT 1: Ingest Data dari Bookmarklet (Mendukung Multi-Page / Halaman 1, 2, 3, dst.)
 app.post("/api/ingest", async (c) => {
   try {
     const body = await c.req.json();
     const parsedRows: Record<string, string>[] = body.rows || [];
+    const pageNumber = Number(body.page || 1);
+    const isAppendMode =
+      body.mode === "append" || (Number.isFinite(pageNumber) && pageNumber > 1);
 
     if (!Array.isArray(parsedRows) || parsedRows.length === 0) {
       return c.json({ error: "Tidak ada data tiket yang dikirim." }, 400);
@@ -37,12 +40,9 @@ app.post("/api/ingest", async (c) => {
       );
     }
 
-    // 1. Siapkan statement penghapusan seluruh data lama
-    const deleteStmt = c.env.DB.prepare("DELETE FROM incidents");
-
-    // 2. Siapkan statement insert data terbaru (termasuk booking_date)
+    // Gunakan INSERT OR REPLACE agar tiket yang sama tidak duplikat jika halaman bergeser
     const insertStmt = c.env.DB.prepare(`
-      INSERT INTO incidents (
+      INSERT OR REPLACE INTO incidents (
         incident, reported_date, booking_date, service_type, witel, workzone,
         status, status_date, ticket_id_gamas, contact_phone, contact_name,
         customer_type, customer_name, service_no, symptom,
@@ -62,7 +62,7 @@ app.post("/api/ingest", async (c) => {
       const ticketIdGamas = rawGamas !== "" ? rawGamas : "-";
 
       return insertStmt.bind(
-        r["INCIDENT"] || "",
+        (r["INCIDENT"] || "").trim(),
         r["REPORTED DATE"] || "",
         r["BOOKING DATE"] || "",
         r["SERVICE TYPE"] || "",
@@ -90,18 +90,35 @@ app.post("/api/ingest", async (c) => {
       );
     });
 
-    // Eksekusi batch pertama berisi DELETE + 50 baris pertama secara atomik
-    await c.env.DB.batch([deleteStmt, ...insertBatch.slice(0, 50)]);
+    if (!isAppendMode) {
+      // Halaman 1 (Reset): Bersihkan data lama + masukkan 50 baris pertama secara atomik
+      const deleteStmt = c.env.DB.prepare("DELETE FROM incidents");
+      await c.env.DB.batch([deleteStmt, ...insertBatch.slice(0, 50)]);
+    } else {
+      // Halaman 2, 3, dst. (Append): Pertahankan data halaman sebelumnya & tambahkan/perbarui
+      await c.env.DB.batch(insertBatch.slice(0, 50));
+    }
 
-    // Jika tiket lebih dari 50 baris, masukkan sisa barisnya per 50 baris
+    // Jika dalam 1 halaman ada lebih dari 50 baris, masukkan sisanya per 50 baris
     for (let i = 50; i < insertBatch.length; i += 50) {
       await c.env.DB.batch(insertBatch.slice(i, i + 50));
     }
 
+    // Hitung total tiket terkumpul saat ini di database D1
+    const countRow = await c.env.DB.prepare(
+      "SELECT COUNT(*) as total FROM incidents"
+    ).first<{ total: number }>();
+    const totalInDb = countRow?.total ?? validRows.length;
+
     return c.json({
       success: true,
+      mode: isAppendMode ? "append" : "reset",
+      page: pageNumber,
       syncedCount: validRows.length,
-      message: `Sukses! Data lama dibersihkan & diganti dengan ${validRows.length} tiket terbaru.`,
+      totalInDb,
+      message: isAppendMode
+        ? `Halaman ${pageNumber} (+${validRows.length} tiket) berhasil ditambahkan! Total terkumpul: ${totalInDb} tiket.`
+        : `Halaman 1 berhasil dimuat (${validRows.length} tiket). Jika ada halaman berikutnya, pindah ke Page 2 lalu jalankan bookmarklet lagi.`,
     });
   } catch (err: any) {
     return c.json({ error: `Ingest Error: ${err.message}` }, 500);

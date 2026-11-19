@@ -428,17 +428,20 @@ export default function DashboardPage({
   };
 
   // Donut Chart SVG Calculation
-  const radius = 42;
+  const radius = 40;
   const circumference = 2 * Math.PI * radius;
   const jakutPct = globalStats.total ? globalStats.jakutCount / globalStats.total : 0;
   const jakbarPct = globalStats.total ? globalStats.jakbarCount / globalStats.total : 0;
   const jakutStroke = jakutPct * circumference;
   const jakbarStroke = jakbarPct * circumference;
 
-  // Component Reusable untuk Kartu Rapat dengan Pill Bar + Header Kolom Jakbar | Jakut | Total
+  // Component Reusable untuk Kartu Rapat dengan Pill Header Judul + Pill Header Kolom + Pill Data
   const renderCompactPillCard = (params: {
     title: string;
-    headerGradient: string;
+    titlePillBg: string;
+    titlePillColor?: string;
+    colHeaderPillBg: string;
+    colHeaderTextColor: string;
     bigValue: string | number;
     bigValueColor: string;
     bigValueFontSize?: string;
@@ -465,10 +468,13 @@ export default function DashboardPage({
   }) => {
     const {
       title,
-      headerGradient,
+      titlePillBg,
+      titlePillColor = "#ffffff",
+      colHeaderPillBg,
+      colHeaderTextColor,
       bigValue,
       bigValueColor,
-      bigValueFontSize = "28px",
+      bigValueFontSize = "26px",
       defaultPillBg,
       defaultPillActiveBg,
       defaultPillBorder,
@@ -488,142 +494,143 @@ export default function DashboardPage({
           background: "#ffffff",
           borderRadius: "10px",
           border: "1px solid #e2e8f0",
-          overflow: "hidden",
+          padding: "8px 9px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
           boxShadow: "0 1px 3px rgba(15, 23, 42, 0.05)",
         }}
       >
-        {/* Header Berwarna Modern */}
+        {/* Judul Card sebagai Pill Horizontal */}
         <div
           style={{
-            background: headerGradient,
-            padding: "7px 12px",
+            background: titlePillBg,
+            borderRadius: "99px",
+            padding: "5px 12px",
             textAlign: "center",
             fontWeight: 800,
-            fontSize: "11.5px",
-            color: "#ffffff",
+            fontSize: "10.5px",
+            color: titlePillColor,
             letterSpacing: "0.35px",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {title}
         </div>
 
-        {/* Angka Besar Tengah (Rapat) */}
+        {/* Angka Besar Tengah */}
         <div
           style={{
-            padding: "10px 10px 4px 10px",
+            padding: "7px 6px 5px 6px",
             textAlign: "center",
             fontSize: bigValueFontSize,
             fontWeight: 800,
             color: bigValueColor,
-            lineHeight: 1.15,
+            lineHeight: 1.1,
             letterSpacing: "-0.3px",
           }}
         >
           {bigValue}
         </div>
 
-        {/* Area Header Kolom Merah + Daftar Pill Bar Rapat */}
-        <div style={{ padding: "0 11px 10px 11px" }}>
+        {/* Header Kolom (Jakbar | Jakut | Total) sebagai Pill Horizontal + Daftar Pill Data */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "3.5px" }}>
           <div
             style={{
+              background: colHeaderPillBg,
+              borderRadius: "99px",
+              padding: "3px 9px",
               display: "grid",
-              gridTemplateColumns: "1fr 44px 44px 44px",
+              gridTemplateColumns: "1fr 40px 40px 40px",
               alignItems: "center",
-              padding: "2px 10px 4px 10px",
+              fontSize: "10px",
+              fontWeight: 800,
+              color: colHeaderTextColor,
             }}
           >
             <span />
-            <span style={{ textAlign: "center", fontWeight: 700, fontSize: "10.5px", color: "#dc2626" }}>
-              Jakbar
-            </span>
-            <span style={{ textAlign: "center", fontWeight: 700, fontSize: "10.5px", color: "#dc2626" }}>
-              Jakut
-            </span>
-            <span style={{ textAlign: "center", fontWeight: 700, fontSize: "10.5px", color: "#dc2626" }}>
-              Total
-            </span>
+            <span style={{ textAlign: "center" }}>Jakbar</span>
+            <span style={{ textAlign: "center" }}>Jakut</span>
+            <span style={{ textAlign: "center" }}>Total</span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            {rows.map((r) => {
-              const isSelected = activeFilterValue === r.label;
-              const styleCfg = rowStyleOverrides?.[r.label] || {
-                pillBg: defaultPillBg,
-                pillActiveBg: defaultPillActiveBg,
-                pillBorder: defaultPillBorder,
-                pillActiveBorder: defaultPillActiveBorder,
-                labelColor: defaultLabelColor,
-                valueColor: defaultValueColor,
-              };
+          {rows.map((r) => {
+            const isSelected = activeFilterValue === r.label;
+            const styleCfg = rowStyleOverrides?.[r.label] || {
+              pillBg: defaultPillBg,
+              pillActiveBg: defaultPillActiveBg,
+              pillBorder: defaultPillBorder,
+              pillActiveBorder: defaultPillActiveBorder,
+              labelColor: defaultLabelColor,
+              valueColor: defaultValueColor,
+            };
 
-              return (
-                <div
-                  key={r.label}
-                  className="stat-pill"
-                  onClick={() => onRowClick && onRowClick(r.label)}
+            return (
+              <div
+                key={r.label}
+                className="stat-pill"
+                onClick={() => onRowClick && onRowClick(r.label)}
+                style={{
+                  background: isSelected ? styleCfg.pillActiveBg : styleCfg.pillBg,
+                  border: isSelected
+                    ? `1.5px solid ${styleCfg.pillActiveBorder}`
+                    : `1px solid ${styleCfg.pillBorder}`,
+                  borderRadius: "99px",
+                  padding: "3.5px 9px",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 40px 40px 40px",
+                  alignItems: "center",
+                  fontSize: "11px",
+                  cursor: onRowClick ? "pointer" : "default",
+                }}
+                title={onRowClick ? `Klik untuk filter ${r.label}` : undefined}
+              >
+                <span
                   style={{
-                    background: isSelected ? styleCfg.pillActiveBg : styleCfg.pillBg,
-                    border: isSelected
-                      ? `1.5px solid ${styleCfg.pillActiveBorder}`
-                      : `1px solid ${styleCfg.pillBorder}`,
-                    borderRadius: "6px",
-                    padding: "4px 10px",
-                    display: "grid",
-                    gridTemplateColumns: "1fr 44px 44px 44px",
-                    alignItems: "center",
-                    fontSize: "11.5px",
-                    cursor: onRowClick ? "pointer" : "default",
+                    color: styleCfg.labelColor,
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
                   }}
-                  title={onRowClick ? `Klik untuk filter ${r.label}` : undefined}
                 >
-                  <span
-                    style={{
-                      color: styleCfg.labelColor,
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {r.label}
-                  </span>
+                  {r.label}
+                </span>
 
-                  <span
-                    style={{
-                      textAlign: "center",
-                      fontWeight: r.jakbar > 0 ? 700 : 600,
-                      color: r.jakbar === 0 ? "#16a34a" : styleCfg.valueColor,
-                    }}
-                  >
-                    {r.jakbar}
-                  </span>
+                <span
+                  style={{
+                    textAlign: "center",
+                    fontWeight: r.jakbar > 0 ? 700 : 600,
+                    color: r.jakbar === 0 ? "#16a34a" : styleCfg.valueColor,
+                  }}
+                >
+                  {r.jakbar}
+                </span>
 
-                  <span
-                    style={{
-                      textAlign: "center",
-                      fontWeight: r.jakut > 0 ? 700 : 600,
-                      color: r.jakut === 0 ? "#16a34a" : styleCfg.valueColor,
-                    }}
-                  >
-                    {r.jakut}
-                  </span>
+                <span
+                  style={{
+                    textAlign: "center",
+                    fontWeight: r.jakut > 0 ? 700 : 600,
+                    color: r.jakut === 0 ? "#16a34a" : styleCfg.valueColor,
+                  }}
+                >
+                  {r.jakut}
+                </span>
 
-                  <span
-                    style={{
-                      textAlign: "center",
-                      fontWeight: 800,
-                      color: r.total === 0 ? "#16a34a" : styleCfg.valueColor,
-                    }}
-                  >
-                    {r.total}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                <span
+                  style={{
+                    textAlign: "center",
+                    fontWeight: 800,
+                    color: r.total === 0 ? "#16a34a" : styleCfg.valueColor,
+                  }}
+                >
+                  {r.total}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -649,22 +656,22 @@ export default function DashboardPage({
       <div
         style={{
           background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-          padding: "10px 16px",
+          padding: "9px 14px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           gap: "8px",
         }}
       >
-        <span style={{ fontWeight: 700, fontSize: "13px", color: "#ffffff", letterSpacing: "0.2px" }}>
+        <span style={{ fontWeight: 700, fontSize: "12.5px", color: "#ffffff", letterSpacing: "0.2px" }}>
           {title}
         </span>
         <span
           style={{
-            background: "rgba(255,255,255,0.18)",
+            background: "rgba(255,255,255,0.2)",
             padding: "2px 10px",
             borderRadius: "99px",
-            fontSize: "11.5px",
+            fontSize: "11px",
             fontWeight: 700,
             color: "#ffffff",
             whiteSpace: "nowrap",
@@ -678,10 +685,10 @@ export default function DashboardPage({
         <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
           <thead>
             <tr style={{ borderBottom: "2px solid #cbd5e1", background: "#f8fafc" }}>
-              <th style={{ padding: "8px 10px", fontSize: "11px", fontWeight: 700, color: "#475569", width: "36px" }}>
+              <th style={{ padding: "7px 10px", fontSize: "11px", fontWeight: 700, color: "#475569", width: "36px" }}>
                 NO
               </th>
-              <th style={{ padding: "8px 10px", fontSize: "11px", fontWeight: 700, color: "#475569" }}>
+              <th style={{ padding: "7px 10px", fontSize: "11px", fontWeight: 700, color: "#475569" }}>
                 WORKZONE
               </th>
               {matrixSegments.map((seg) => (
@@ -689,7 +696,7 @@ export default function DashboardPage({
                   key={seg}
                   title={seg}
                   style={{
-                    padding: "8px 8px",
+                    padding: "7px 8px",
                     fontSize: "11px",
                     fontWeight: 700,
                     color: "#475569",
@@ -702,7 +709,7 @@ export default function DashboardPage({
               ))}
               <th
                 style={{
-                  padding: "8px 12px",
+                  padding: "7px 12px",
                   fontSize: "11px",
                   fontWeight: 800,
                   color: "#1d4ed8",
@@ -738,10 +745,10 @@ export default function DashboardPage({
                   }}
                   title="Klik untuk memfilter tabel detail berdasarkan Workzone ini"
                 >
-                  <td style={{ padding: "7px 10px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                  <td style={{ padding: "6.5px 10px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
                     {idx + 1}
                   </td>
-                  <td style={{ padding: "7px 10px", fontSize: "12.5px", fontWeight: 700, color: isSelected ? "#1d4ed8" : "#0f172a" }}>
+                  <td style={{ padding: "6.5px 10px", fontSize: "12px", fontWeight: 700, color: isSelected ? "#1d4ed8" : "#0f172a" }}>
                     {row.workzone}
                   </td>
                   {matrixSegments.map((seg) => {
@@ -750,8 +757,8 @@ export default function DashboardPage({
                       <td
                         key={seg}
                         style={{
-                          padding: "7px 8px",
-                          fontSize: "12.5px",
+                          padding: "6.5px 8px",
+                          fontSize: "12px",
                           textAlign: "center",
                           fontWeight: 700,
                           color: val === 0 ? "#16a34a" : "#1e293b",
@@ -761,7 +768,7 @@ export default function DashboardPage({
                       </td>
                     );
                   })}
-                  <td style={{ padding: "7px 12px", textAlign: "center" }}>
+                  <td style={{ padding: "6.5px 12px", textAlign: "center" }}>
                     <span
                       style={{
                         background: isSelected
@@ -780,7 +787,7 @@ export default function DashboardPage({
                           ? "#15803d"
                           : "#1d4ed8",
                         fontWeight: 800,
-                        fontSize: "12px",
+                        fontSize: "11.5px",
                         padding: "2px 10px",
                         borderRadius: "99px",
                         display: "inline-block",
@@ -796,7 +803,7 @@ export default function DashboardPage({
 
             {/* BARIS GRAND TOTAL */}
             <tr style={{ background: "#f1f5f9", borderTop: "2px solid #cbd5e1" }}>
-              <td colSpan={2} style={{ padding: "9px 10px", fontSize: "12px", fontWeight: 800, color: "#0f172a" }}>
+              <td colSpan={2} style={{ padding: "8px 10px", fontSize: "12px", fontWeight: 800, color: "#0f172a" }}>
                 GRAND TOTAL {witelCode}
               </td>
               {matrixSegments.map((seg) => {
@@ -805,8 +812,8 @@ export default function DashboardPage({
                   <td
                     key={seg}
                     style={{
-                      padding: "9px 8px",
-                      fontSize: "12.5px",
+                      padding: "8px 8px",
+                      fontSize: "12px",
                       fontWeight: 800,
                       color: colTotal === 0 ? "#16a34a" : "#0f172a",
                       textAlign: "center",
@@ -816,14 +823,14 @@ export default function DashboardPage({
                   </td>
                 );
               })}
-              <td style={{ padding: "9px 12px", textAlign: "center" }}>
+              <td style={{ padding: "8px 12px", textAlign: "center" }}>
                 <span
                   style={{
                     background: "#dcfce7",
                     border: "1px solid #86efac",
                     color: "#15803d",
                     fontWeight: 800,
-                    fontSize: "12.5px",
+                    fontSize: "12px",
                     padding: "2px 11px",
                     borderRadius: "99px",
                     display: "inline-block",
@@ -841,7 +848,7 @@ export default function DashboardPage({
   );
 
   const thStyle: React.CSSProperties = {
-    padding: "9px 12px",
+    padding: "8px 12px",
     whiteSpace: "nowrap",
     fontWeight: 700,
     fontSize: "11px",
@@ -851,32 +858,32 @@ export default function DashboardPage({
   };
 
   const tdStyle: React.CSSProperties = {
-    padding: "8px 12px",
+    padding: "7px 12px",
     whiteSpace: "nowrap",
-    fontSize: "12.5px",
+    fontSize: "12px",
     color: "#334155",
   };
 
   return (
-    <div style={{ width: "100%", maxWidth: "1640px", margin: "0 auto", padding: "14px 18px" }}>
+    <div style={{ width: "100%", maxWidth: "1680px", margin: "0 auto", padding: "10px 14px" }}>
       {/* HEADER BAR */}
       <div
         style={{
           background: "#ffffff",
           border: "1px solid #e2e8f0",
           borderRadius: "10px",
-          padding: "12px 18px",
-          marginBottom: "14px",
+          padding: "10px 16px",
+          marginBottom: "10px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           flexWrap: "wrap",
-          gap: "12px",
+          gap: "10px",
           boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: "18.5px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>
+          <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>
             Monitoring Gangguan Branch Northern Jakarta – {todayTitle}
           </h1>
           <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
@@ -893,9 +900,9 @@ export default function DashboardPage({
               background: "#16a34a",
               color: "#fff",
               border: "none",
-              padding: "7px 14px",
-              borderRadius: "6px",
-              fontSize: "12.5px",
+              padding: "6px 13px",
+              borderRadius: "99px",
+              fontSize: "12px",
               fontWeight: 600,
               cursor: "pointer",
             }}
@@ -910,9 +917,9 @@ export default function DashboardPage({
               background: "#2563eb",
               color: "#fff",
               border: "none",
-              padding: "7px 16px",
-              borderRadius: "6px",
-              fontSize: "12.5px",
+              padding: "6px 15px",
+              borderRadius: "99px",
+              fontSize: "12px",
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
             }}
@@ -922,8 +929,8 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* GRID BENTO ASIMETRIS RAPAT: KARTU 1 SPAN 2 BARIS DI KIRI + 5 KARTU MATRIKS PILL DI KANAN */}
-      <div className="kpi-bento-grid" style={{ marginBottom: "16px" }}>
+      {/* GRID BENTO ULTRA-RAPAT: KARTU 1 SPAN 2 BARIS DI KIRI + 5 KARTU MATRIKS PILL DI KANAN */}
+      <div className="kpi-bento-grid" style={{ marginBottom: "12px" }}>
         {/* KARTU 1 (SPAN 2 BARIS): TOTAL TIKET AKTIF + DONUT CHART */}
         <div
           className="kpi-card kpi-hero-card"
@@ -931,72 +938,84 @@ export default function DashboardPage({
             background: "#ffffff",
             borderRadius: "10px",
             border: "1px solid #e2e8f0",
-            padding: "16px 16px 14px 16px",
+            padding: "10px 11px",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
             boxShadow: "0 1px 3px rgba(15, 23, 42, 0.05)",
           }}
         >
-          <div style={{ fontSize: "12.5px", fontWeight: 800, color: "#475569", textTransform: "uppercase", textAlign: "center", letterSpacing: "0.4px" }}>
+          {/* Judul Card Pill Horizontal */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
+              borderRadius: "99px",
+              padding: "5px 12px",
+              textAlign: "center",
+              fontWeight: 800,
+              fontSize: "11px",
+              color: "#ffffff",
+              letterSpacing: "0.4px",
+            }}
+          >
             TOTAL TIKET AKTIF
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", margin: "12px 0" }}>
-            <svg width="136" height="136" viewBox="0 0 110 110" style={{ filter: "drop-shadow(0 4px 10px rgba(37,99,235,0.12))" }}>
-              <circle cx="55" cy="55" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="12" />
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", margin: "8px 0" }}>
+            <svg width="132" height="132" viewBox="0 0 104 104" style={{ filter: "drop-shadow(0 4px 10px rgba(37,99,235,0.12))" }}>
+              <circle cx="52" cy="52" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="11" />
               {globalStats.total > 0 && (
                 <>
                   <circle
-                    cx="55"
-                    cy="55"
+                    cx="52"
+                    cy="52"
                     r={radius}
                     fill="transparent"
                     stroke="#16a34a"
-                    strokeWidth="12"
+                    strokeWidth="11"
                     strokeDasharray={`${jakutStroke} ${circumference}`}
-                    transform="rotate(-90 55 55)"
+                    transform="rotate(-90 52 52)"
                   />
                   <circle
-                    cx="55"
-                    cy="55"
+                    cx="52"
+                    cy="52"
                     r={radius}
                     fill="transparent"
                     stroke="#2563eb"
-                    strokeWidth="12"
+                    strokeWidth="11"
                     strokeDasharray={`${jakbarStroke} ${circumference}`}
                     strokeDashoffset={-jakutStroke}
-                    transform="rotate(-90 55 55)"
+                    transform="rotate(-90 52 52)"
                   />
                 </>
               )}
-              <text x="55" y="53" textAnchor="middle" fill="#0f172a" fontSize="24" fontWeight="800">
+              <text x="52" y="50" textAnchor="middle" fill="#0f172a" fontSize="22" fontWeight="800">
                 {globalStats.total}
               </text>
-              <text x="55" y="67" textAnchor="middle" fill="#64748b" fontSize="8.5" fontWeight="700">
+              <text x="52" y="63" textAnchor="middle" fill="#64748b" fontSize="8" fontWeight="700">
                 OPEN TIKET
               </text>
             </svg>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             <div
               className="stat-pill"
               onClick={() => setFilterWitel(filterWitel === "JAKBAR" ? "ALL" : "JAKBAR")}
               style={{
                 background: filterWitel === "JAKBAR" ? "#dbeafe" : "#eff6ff",
                 border: filterWitel === "JAKBAR" ? "1.5px solid #2563eb" : "1px solid #bfdbfe",
-                borderRadius: "8px",
-                padding: "9px 14px",
+                borderRadius: "99px",
+                padding: "7px 14px",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                fontSize: "13px",
+                fontSize: "12.5px",
                 cursor: "pointer",
               }}
             >
               <span style={{ color: "#1d4ed8", fontWeight: 700 }}>Witel JAKBAR</span>
-              <span style={{ color: "#1e3a8a", fontWeight: 800, fontSize: "14px" }}>{globalStats.jakbarCount}</span>
+              <span style={{ color: "#1e3a8a", fontWeight: 800, fontSize: "13.5px" }}>{globalStats.jakbarCount}</span>
             </div>
             <div
               className="stat-pill"
@@ -1004,25 +1023,27 @@ export default function DashboardPage({
               style={{
                 background: filterWitel === "JAKUT" ? "#dcfce7" : "#f0fdf4",
                 border: filterWitel === "JAKUT" ? "1.5px solid #16a34a" : "1px solid #bbf7d0",
-                borderRadius: "8px",
-                padding: "9px 14px",
+                borderRadius: "99px",
+                padding: "7px 14px",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                fontSize: "13px",
+                fontSize: "12.5px",
                 cursor: "pointer",
               }}
             >
               <span style={{ color: "#15803d", fontWeight: 700 }}>Witel JAKUT</span>
-              <span style={{ color: "#14532d", fontWeight: 800, fontSize: "14px" }}>{globalStats.jakutCount}</span>
+              <span style={{ color: "#14532d", fontWeight: 800, fontSize: "13.5px" }}>{globalStats.jakutCount}</span>
             </div>
           </div>
         </div>
 
-        {/* KARTU 2 (BARIS 1 KOLOM 2): INDIKASI GAMAS (TICKET ID) */}
+        {/* KARTU 2: INDIKASI GAMAS (TICKET ID) */}
         {renderCompactPillCard({
           title: "INDIKASI GAMAS (TICKET ID)",
-          headerGradient: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+          titlePillBg: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+          colHeaderPillBg: "#ffe4e6",
+          colHeaderTextColor: "#be123c",
           bigValue: globalStats.gamasTotal,
           bigValueColor: "#dc2626",
           defaultPillBg: "#fef2f2",
@@ -1057,13 +1078,15 @@ export default function DashboardPage({
           },
         })}
 
-        {/* KARTU 3 (BARIS 1 KOLOM 3): SEGMEN */}
+        {/* KARTU 3: SEGMEN */}
         {renderCompactPillCard({
           title: "SEGMEN",
-          headerGradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+          titlePillBg: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+          colHeaderPillBg: "#fef3c7",
+          colHeaderTextColor: "#b45309",
           bigValue: `HVC : ${globalStats.hvcTotal} | REG : ${globalStats.regTotal}`,
           bigValueColor: "#d97706",
-          bigValueFontSize: "20px",
+          bigValueFontSize: "18.5px",
           defaultPillBg: "#fffbeb",
           defaultPillActiveBg: "#fef3c7",
           defaultPillBorder: "#fde68a",
@@ -1077,10 +1100,12 @@ export default function DashboardPage({
           },
         })}
 
-        {/* KARTU 4 (BARIS 1 KOLOM 4): STATUS TIKET */}
+        {/* KARTU 4: STATUS TIKET */}
         {renderCompactPillCard({
           title: "STATUS TIKET",
-          headerGradient: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+          titlePillBg: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+          colHeaderPillBg: "#dbeafe",
+          colHeaderTextColor: "#1d4ed8",
           bigValue: globalStats.total,
           bigValueColor: "#2563eb",
           defaultPillBg: "#eff6ff",
@@ -1096,10 +1121,12 @@ export default function DashboardPage({
           },
         })}
 
-        {/* KARTU 5 (BARIS 2 KOLOM 2): SERVICE TYPE */}
+        {/* KARTU 5: SERVICE TYPE */}
         {renderCompactPillCard({
           title: "SERVICE TYPE",
-          headerGradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+          titlePillBg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+          colHeaderPillBg: "#d1fae5",
+          colHeaderTextColor: "#047857",
           bigValue: globalStats.total,
           bigValueColor: "#059669",
           defaultPillBg: "#ecfdf5",
@@ -1111,10 +1138,12 @@ export default function DashboardPage({
           rows: globalStats.serviceRows,
         })}
 
-        {/* KARTU 6 (BARIS 2 KOLOM 3): STATUS MANJA */}
+        {/* KARTU 6: STATUS MANJA */}
         {renderCompactPillCard({
           title: "STATUS MANJA",
-          headerGradient: "linear-gradient(135deg, #84cc16 0%, #65a30d 100%)",
+          titlePillBg: "linear-gradient(135deg, #84cc16 0%, #65a30d 100%)",
+          colHeaderPillBg: "#dcfce7",
+          colHeaderTextColor: "#15803d",
           bigValue: globalStats.total,
           bigValueColor: "#16a34a",
           defaultPillBg: "#f0fdf4",
@@ -1132,7 +1161,7 @@ export default function DashboardPage({
       </div>
 
       {/* 2 TABEL REKAP MATRIKS PER WITEL: WORKZONE X SEGMEN */}
-      <div className="matrix-tables-grid" style={{ marginBottom: "18px" }}>
+      <div className="matrix-tables-grid" style={{ marginBottom: "14px" }}>
         {renderMatrixCard("REKAP TIKET WITEL JAKUT (WORKZONE × SEGMEN)", "JAKUT", jakutMatrix)}
         {renderMatrixCard("REKAP TIKET WITEL JAKBAR (WORKZONE × SEGMEN)", "JAKBAR", jakbarMatrix)}
       </div>
@@ -1141,7 +1170,7 @@ export default function DashboardPage({
       <div
         style={{
           background: "#ffffff",
-          padding: "14px 16px",
+          padding: "12px 14px",
           borderRadius: "10px",
           border: "1px solid #e2e8f0",
           boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
@@ -1153,19 +1182,19 @@ export default function DashboardPage({
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: "10px",
-            marginBottom: "12px",
+            gap: "8px",
+            marginBottom: "10px",
           }}
         >
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontWeight: 700, fontSize: "13.5px", color: "#0f172a", marginRight: "4px" }}>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontWeight: 700, fontSize: "13px", color: "#0f172a", marginRight: "4px" }}>
               DETAIL TIKET ({filteredData.length})
             </span>
 
             <select
               value={filterWitel}
               onChange={(e) => setFilterWitel(e.target.value)}
-              style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+              style={{ padding: "5px 10px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
             >
               <option value="ALL">Semua Witel</option>
               {filterOptions.witels.map((w) => (
@@ -1176,7 +1205,7 @@ export default function DashboardPage({
             <select
               value={filterWorkzone}
               onChange={(e) => setFilterWorkzone(e.target.value)}
-              style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+              style={{ padding: "5px 10px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
             >
               <option value="ALL">Semua Workzone</option>
               {filterOptions.workzones.map((wz) => (
@@ -1187,7 +1216,7 @@ export default function DashboardPage({
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+              style={{ padding: "5px 10px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
             >
               <option value="ALL">Semua Status</option>
               {filterOptions.statuses.map((st) => (
@@ -1198,7 +1227,7 @@ export default function DashboardPage({
             <select
               value={filterCustType}
               onChange={(e) => setFilterCustType(e.target.value)}
-              style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+              style={{ padding: "5px 10px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
             >
               <option value="ALL">Semua Segmen</option>
               {filterOptions.custTypes.map((ct) => (
@@ -1209,7 +1238,7 @@ export default function DashboardPage({
             <select
               value={filterGamas}
               onChange={(e) => setFilterGamas(e.target.value)}
-              style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+              style={{ padding: "5px 10px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
             >
               <option value="ALL">Semua Gamas</option>
               <option value="GAMAS">Hanya Tiket Gamas</option>
@@ -1219,7 +1248,7 @@ export default function DashboardPage({
             <select
               value={filterManja}
               onChange={(e) => setFilterManja(e.target.value)}
-              style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
+              style={{ padding: "5px 10px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "12px", background: "#fff" }}
             >
               <option value="ALL">Semua Status Manja</option>
               {CARD_MANJA_ORDER.map((m) => (
@@ -1235,8 +1264,8 @@ export default function DashboardPage({
                   background: "#fee2e2",
                   color: "#b91c1c",
                   border: "1px solid #fecaca",
-                  padding: "6px 12px",
-                  borderRadius: "6px",
+                  padding: "5px 12px",
+                  borderRadius: "99px",
                   fontSize: "12px",
                   fontWeight: 600,
                   cursor: "pointer",
@@ -1252,7 +1281,7 @@ export default function DashboardPage({
             placeholder="Cari INCIDENT / SERVICE NO / CUSTOMER..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", width: "260px", fontSize: "12px" }}
+            style={{ padding: "5px 12px", borderRadius: "99px", border: "1px solid #cbd5e1", width: "260px", fontSize: "12px" }}
           />
         </div>
 

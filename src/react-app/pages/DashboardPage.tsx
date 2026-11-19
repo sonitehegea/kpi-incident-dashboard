@@ -30,6 +30,136 @@ export default function DashboardPage({
     setFilterGamas("ALL");
   };
 
+  // Judul Tanggal Hari Ini (Format Indonesia)
+  const todayTitle = useMemo(() => {
+    return new Date().toLocaleDateString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  }, []);
+
+  // Kalkulasi Global untuk 5 Kartu Atas
+  const globalStats = useMemo(() => {
+    const total = incidents.length;
+    let jakutCount = 0;
+    let jakbarCount = 0;
+    let otherWitelCount = 0;
+    let gamasCount = 0;
+    let hvcCount = 0;
+
+    const bySegment: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    const byService: Record<string, number> = {};
+
+    incidents.forEach((row) => {
+      const wt = (row.witel || "").toUpperCase();
+      if (wt.includes("JAKUT")) jakutCount++;
+      else if (wt.includes("JAKBAR")) jakbarCount++;
+      else otherWitelCount++;
+
+      const isGamas = Boolean(
+        row.ticket_id_gamas &&
+          row.ticket_id_gamas.trim() !== "" &&
+          row.ticket_id_gamas !== "-"
+      );
+      if (isGamas) gamasCount++;
+
+      const seg = (row.customer_type || "UNKNOWN").toUpperCase();
+      if (seg.includes("HVC")) hvcCount++;
+      bySegment[seg] = (bySegment[seg] || 0) + 1;
+
+      const st = (row.status || "UNKNOWN").toUpperCase();
+      byStatus[st] = (byStatus[st] || 0) + 1;
+
+      const srv = (row.service_type || "UNKNOWN").toUpperCase();
+      byService[srv] = (byService[srv] || 0) + 1;
+    });
+
+    const sortDesc = (obj: Record<string, number>) =>
+      Object.entries(obj).sort((a, b) => b[1] - a[1]);
+
+    return {
+      total,
+      jakutCount,
+      jakbarCount,
+      otherWitelCount,
+      gamasCount,
+      nonGamasCount: total - gamasCount,
+      hvcCount,
+      segmentList: sortDesc(bySegment),
+      statusList: sortDesc(byStatus),
+      serviceList: sortDesc(byService),
+    };
+  }, [incidents]);
+
+  // Daftar urutan kolom Segmen untuk Tabel Matriks
+  const matrixSegments = useMemo(() => {
+    const preferredOrder = [
+      "HVC_DIAMOND",
+      "HVC_PLATINUM",
+      "HVC_GOLD",
+      "HVC_SILVER",
+      "REGULER",
+    ];
+    const found = Array.from(
+      new Set(incidents.map((i) => (i.customer_type || "UNKNOWN").toUpperCase()))
+    );
+    return found.sort((a, b) => {
+      const idxA = preferredOrder.indexOf(a);
+      const idxB = preferredOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  }, [incidents]);
+
+  // Helper pembentuk data Matriks Workzone x Segmen per Witel
+  const buildWitelMatrix = (witelKeyword: string) => {
+    const rows = incidents.filter((i) =>
+      (i.witel || "").toUpperCase().includes(witelKeyword)
+    );
+    const wzMap: Record<string, Record<string, number>> = {};
+    const colTotals: Record<string, number> = {};
+    matrixSegments.forEach((s) => (colTotals[s] = 0));
+
+    rows.forEach((r) => {
+      const wz = (r.workzone || "N/A").toUpperCase();
+      const seg = (r.customer_type || "UNKNOWN").toUpperCase();
+      if (!wzMap[wz]) {
+        wzMap[wz] = {};
+        matrixSegments.forEach((s) => (wzMap[wz][s] = 0));
+      }
+      wzMap[wz][seg] = (wzMap[wz][seg] || 0) + 1;
+      colTotals[seg] = (colTotals[seg] || 0) + 1;
+    });
+
+    const sortedWorkzones = Object.entries(wzMap)
+      .map(([wz, counts]) => {
+        const rowTotal = Object.values(counts).reduce((a, b) => a + b, 0);
+        return { workzone: wz, counts, rowTotal };
+      })
+      .sort((a, b) => b.rowTotal - a.rowTotal);
+
+    return {
+      totalTickets: rows.length,
+      workzones: sortedWorkzones,
+      colTotals,
+    };
+  };
+
+  const jakutMatrix = useMemo(
+    () => buildWitelMatrix("JAKUT"),
+    [incidents, matrixSegments]
+  );
+  const jakbarMatrix = useMemo(
+    () => buildWitelMatrix("JAKBAR"),
+    [incidents, matrixSegments]
+  );
+
+  // Filter untuk Tabel Detail Bawah
   const filterOptions = useMemo(() => {
     const witels = Array.from(new Set(incidents.map((i) => i.witel).filter(Boolean))).sort();
     const workzones = Array.from(new Set(incidents.map((i) => i.workzone).filter(Boolean))).sort();
@@ -46,7 +176,9 @@ export default function DashboardPage({
       if (filterCustType !== "ALL" && item.customer_type !== filterCustType) return false;
 
       const hasGamas = Boolean(
-        item.ticket_id_gamas && item.ticket_id_gamas.trim() !== "" && item.ticket_id_gamas !== "-"
+        item.ticket_id_gamas &&
+          item.ticket_id_gamas.trim() !== "" &&
+          item.ticket_id_gamas !== "-"
       );
       if (filterGamas === "GAMAS" && !hasGamas) return false;
       if (filterGamas === "NON_GAMAS" && hasGamas) return false;
@@ -67,62 +199,6 @@ export default function DashboardPage({
       return true;
     });
   }, [incidents, filterWitel, filterWorkzone, filterStatus, filterCustType, filterGamas, search]);
-
-  const analytics = useMemo(() => {
-    const total = filteredData.length;
-    let gamasCount = 0;
-    let hvcCount = 0;
-    const byWorkzone: Record<string, number> = {};
-    const byStatus: Record<string, number> = {};
-    const byCustType: Record<string, number> = {};
-    const byServiceType: Record<string, number> = {};
-    const bySymptom: Record<string, number> = {};
-    const byWitel: Record<string, number> = {};
-
-    filteredData.forEach((row) => {
-      const isGamas = Boolean(
-        row.ticket_id_gamas && row.ticket_id_gamas.trim() !== "" && row.ticket_id_gamas !== "-"
-      );
-      if (isGamas) gamasCount++;
-
-      const cType = (row.customer_type || "UNKNOWN").toUpperCase();
-      if (cType.includes("HVC")) hvcCount++;
-
-      const wz = row.workzone || "N/A";
-      byWorkzone[wz] = (byWorkzone[wz] || 0) + 1;
-
-      const st = row.status || "N/A";
-      byStatus[st] = (byStatus[st] || 0) + 1;
-
-      byCustType[cType] = (byCustType[cType] || 0) + 1;
-
-      const srv = row.service_type || "N/A";
-      byServiceType[srv] = (byServiceType[srv] || 0) + 1;
-
-      const sym = row.symptom || "Tidak Ada Symptom";
-      bySymptom[sym] = (bySymptom[sym] || 0) + 1;
-
-      const wt = row.witel || "N/A";
-      byWitel[wt] = (byWitel[wt] || 0) + 1;
-    });
-
-    const sortDesc = (obj: Record<string, number>) =>
-      Object.entries(obj).sort((a, b) => b[1] - a[1]);
-
-    return {
-      total,
-      gamasCount,
-      nonGamasCount: total - gamasCount,
-      hvcCount,
-      regulerCount: total - hvcCount,
-      workzoneList: sortDesc(byWorkzone),
-      statusList: sortDesc(byStatus),
-      custTypeList: sortDesc(byCustType),
-      serviceTypeList: sortDesc(byServiceType),
-      symptomList: sortDesc(bySymptom).slice(0, 6),
-      witelList: sortDesc(byWitel),
-    };
-  }, [filteredData]);
 
   const handleExportCsv = () => {
     if (!filteredData.length) return;
@@ -147,11 +223,204 @@ export default function DashboardPage({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Report_Incident_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `Laporan_Gangguan_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
+
+  // Donut Chart SVG Calculation (Jakut vs Jakbar)
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const jakutPct = globalStats.total ? globalStats.jakutCount / globalStats.total : 0;
+  const jakbarPct = globalStats.total ? globalStats.jakbarCount / globalStats.total : 0;
+  const jakutStroke = jakutPct * circumference;
+  const jakbarStroke = jakbarPct * circumference;
+
+  // Component Reusable untuk Tabel Matriks per Witel (Tema Terang)
+  const renderMatrixCard = (
+    title: string,
+    witelCode: string,
+    matrix: ReturnType<typeof buildWitelMatrix>
+  ) => (
+    <div
+      style={{
+        background: "#ffffff",
+        borderRadius: "10px",
+        border: "1px solid #cbd5e1",
+        overflow: "hidden",
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+      }}
+    >
+      {/* Header Biru Solid seperti sebelumnya */}
+      <div
+        style={{
+          background: "#2563eb",
+          padding: "12px 18px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ fontWeight: 700, fontSize: "14px", color: "#ffffff", letterSpacing: "0.3px" }}>
+          {title}
+        </span>
+        <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#dbeafe" }}>
+          {matrix.totalTickets} Tiket
+        </span>
+      </div>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <thead>
+            <tr style={{ borderBottom: "2px solid #cbd5e1", background: "#f8fafc" }}>
+              <th style={{ padding: "10px 14px", fontSize: "11.5px", fontWeight: 700, color: "#334155" }}>
+                NO
+              </th>
+              <th style={{ padding: "10px 14px", fontSize: "11.5px", fontWeight: 700, color: "#334155" }}>
+                WORKZONE
+              </th>
+              {matrixSegments.map((seg) => (
+                <th
+                  key={seg}
+                  style={{
+                    padding: "10px 12px",
+                    fontSize: "11.5px",
+                    fontWeight: 700,
+                    color: "#334155",
+                    textAlign: "center",
+                  }}
+                >
+                  {seg}
+                </th>
+              ))}
+              <th
+                style={{
+                  padding: "10px 14px",
+                  fontSize: "11.5px",
+                  fontWeight: 800,
+                  color: "#1d4ed8",
+                  textAlign: "center",
+                }}
+              >
+                TOTAL
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.workzones.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={matrixSegments.length + 3}
+                  style={{ padding: "20px", textAlign: "center", color: "#64748b", fontSize: "13px" }}
+                >
+                  Tidak ada data tiket untuk {witelCode}.
+                </td>
+              </tr>
+            ) : (
+              <>
+                {matrix.workzones.map((row, idx) => {
+                  const isSelected = filterWorkzone === row.workzone;
+                  return (
+                    <tr
+                      key={row.workzone}
+                      onClick={() => {
+                        setFilterWitel(witelCode);
+                        setFilterWorkzone(isSelected ? "ALL" : row.workzone);
+                      }}
+                      style={{
+                        borderBottom: "1px solid #e2e8f0",
+                        background: isSelected ? "#eff6ff" : "#ffffff",
+                        cursor: "pointer",
+                      }}
+                      title="Klik untuk memfilter tabel detail berdasarkan Workzone ini"
+                    >
+                      <td style={{ padding: "10px 14px", fontSize: "12.5px", fontWeight: 600, color: "#64748b" }}>
+                        {idx + 1}
+                      </td>
+                      <td style={{ padding: "10px 14px", fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>
+                        {row.workzone}
+                      </td>
+                      {matrixSegments.map((seg) => {
+                        const val = row.counts[seg] || 0;
+                        return (
+                          <td
+                            key={seg}
+                            style={{
+                              padding: "10px 12px",
+                              fontSize: "13px",
+                              textAlign: "center",
+                              fontWeight: val > 0 ? 700 : 400,
+                              color: val > 0 ? "#1e293b" : "#94a3b8",
+                            }}
+                          >
+                            {val}
+                          </td>
+                        );
+                      })}
+                      <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                        <span
+                          style={{
+                            background: "#dbeafe",
+                            border: "1px solid #93c5fd",
+                            color: "#1d4ed8",
+                            fontWeight: 800,
+                            fontSize: "12.5px",
+                            padding: "2px 11px",
+                            borderRadius: "99px",
+                            display: "inline-block",
+                          }}
+                        >
+                          {row.rowTotal}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {/* BARIS GRAND TOTAL */}
+                <tr style={{ background: "#f1f5f9", borderTop: "2px solid #cbd5e1" }}>
+                  <td colSpan={2} style={{ padding: "11px 14px", fontSize: "12.5px", fontWeight: 800, color: "#0f172a" }}>
+                    GRAND TOTAL {witelCode}
+                  </td>
+                  {matrixSegments.map((seg) => (
+                    <td
+                      key={seg}
+                      style={{
+                        padding: "11px 12px",
+                        fontSize: "13px",
+                        fontWeight: 800,
+                        color: "#0f172a",
+                        textAlign: "center",
+                      }}
+                    >
+                      {matrix.colTotals[seg] || 0}
+                    </td>
+                  ))}
+                  <td style={{ padding: "11px 14px", textAlign: "center" }}>
+                    <span
+                      style={{
+                        background: "#dcfce7",
+                        border: "1px solid #86efac",
+                        color: "#15803d",
+                        fontWeight: 800,
+                        fontSize: "13px",
+                        padding: "2px 13px",
+                        borderRadius: "99px",
+                        display: "inline-block",
+                      }}
+                    >
+                      {matrix.totalTickets}
+                    </span>
+                  </td>
+                </tr>
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   const thStyle: React.CSSProperties = {
     padding: "10px 12px",
@@ -172,14 +441,29 @@ export default function DashboardPage({
 
   return (
     <div style={{ padding: "20px 24px" }}>
-      {/* HEADER BAR */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
+      {/* HEADER BAR (TEMA TERANG BERSIH) */}
+      <div
+        style={{
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "10px",
+          padding: "16px 20px",
+          marginBottom: "20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "12px",
+          boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: "22px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-            Incident Operations Reporting Dashboard
+          <h1 style={{ margin: 0, fontSize: "21px", fontWeight: 800, color: "#0f172a" }}>
+            Monitoring Gangguan Branch Northern Jakarta – {todayTitle}
           </h1>
           <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>
-            Last Sync: <strong style={{ color: "#334155" }}>{lastSyncWib}</strong> • Total Sumber Data: <strong style={{ color: "#2563eb" }}>{incidents.length} Tiket</strong>
+            Last Sync: <strong style={{ color: "#334155" }}>{lastSyncWib}</strong> • Total Sumber Data:{" "}
+            <strong style={{ color: "#2563eb" }}>{incidents.length} Tiket</strong>
           </div>
         </div>
 
@@ -220,181 +504,410 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* 5 SUMMARY CARDS */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "14px", marginBottom: "20px" }}>
-        <div style={{ background: "#fff", padding: "16px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Total Tiket Aktif</div>
-          <div style={{ fontSize: "30px", fontWeight: 800, color: "#0f172a", margin: "6px 0" }}>{analytics.total}</div>
-          <div style={{ fontSize: "12px", color: "#475569" }}>
-            {analytics.witelList.map(([w, c]) => `${w}: ${c}`).join(" | ") || "Belum ada data"}
-          </div>
-        </div>
-
+      {/* GRID 5 KARTU RINGKASAN PALING ATAS */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "14px",
+          marginBottom: "22px",
+        }}
+      >
+        {/* KARTU 1: TOTAL TIKET AKTIF + DONUT CHART */}
         <div
-          onClick={() => setFilterGamas(filterGamas === "GAMAS" ? "ALL" : "GAMAS")}
-          style={{ background: "#fff", padding: "16px 18px", borderRadius: "10px", border: filterGamas === "GAMAS" ? "2px solid #dc2626" : "1px solid #e2e8f0", cursor: "pointer" }}
-          title="Klik untuk filter Tiket Gamas"
+          style={{
+            background: "#ffffff",
+            borderRadius: "10px",
+            border: "1px solid #e2e8f0",
+            padding: "16px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+          }}
         >
-          <div style={{ fontSize: "12px", fontWeight: 700, color: "#dc2626", textTransform: "uppercase" }}>Indikasi Gamas (Ticket ID)</div>
-          <div style={{ fontSize: "30px", fontWeight: 800, color: "#dc2626", margin: "6px 0" }}>{analytics.gamasCount}</div>
-          <div style={{ fontSize: "12px", color: "#64748b" }}>
-            Non-Gamas: <strong>{analytics.nonGamasCount}</strong> ({analytics.total ? Math.round((analytics.gamasCount / analytics.total) * 100) : 0}% Gamas)
+          <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569", textTransform: "uppercase" }}>
+            TOTAL TIKET AKTIF
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", margin: "10px 0" }}>
+            <svg width="104" height="104" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="11" />
+              {globalStats.total > 0 && (
+                <>
+                  {/* Segmen JAKUT (Hijau) */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="transparent"
+                    stroke="#16a34a"
+                    strokeWidth="11"
+                    strokeDasharray={`${jakutStroke} ${circumference}`}
+                    transform="rotate(-90 50 50)"
+                  />
+                  {/* Segmen JAKBAR (Biru) */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="transparent"
+                    stroke="#2563eb"
+                    strokeWidth="11"
+                    strokeDasharray={`${jakbarStroke} ${circumference}`}
+                    strokeDashoffset={-jakutStroke}
+                    transform="rotate(-90 50 50)"
+                  />
+                </>
+              )}
+              <text x="50" y="48" textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="800">
+                {globalStats.total}
+              </text>
+              <text x="50" y="61" textAnchor="middle" fill="#64748b" fontSize="8" fontWeight="700">
+                OPEN TIKET
+              </text>
+            </svg>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div
+              onClick={() => setFilterWitel(filterWitel === "JAKUT" ? "ALL" : "JAKUT")}
+              style={{
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: "6px",
+                padding: "5px 10px",
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "12px",
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ color: "#15803d", fontWeight: 600 }}>Witel JAKUT</span>
+              <span style={{ color: "#14532d", fontWeight: 800 }}>{globalStats.jakutCount}</span>
+            </div>
+            <div
+              onClick={() => setFilterWitel(filterWitel === "JAKBAR" ? "ALL" : "JAKBAR")}
+              style={{
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                borderRadius: "6px",
+                padding: "5px 10px",
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "12px",
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ color: "#1d4ed8", fontWeight: 600 }}>Witel JAKBAR</span>
+              <span style={{ color: "#1e3a8a", fontWeight: 800 }}>{globalStats.jakbarCount}</span>
+            </div>
           </div>
         </div>
 
-        <div style={{ background: "#fff", padding: "16px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: "#d97706", textTransform: "uppercase" }}>Segmen HVC</div>
-          <div style={{ fontSize: "30px", fontWeight: 800, color: "#d97706", margin: "6px 0" }}>{analytics.hvcCount}</div>
-          <div style={{ fontSize: "12px", color: "#64748b" }}>
-            Reguler / Lainnya: <strong>{analytics.regulerCount}</strong>
+        {/* KARTU 2: INDIKASI GAMAS (HEADER MERAH) */}
+        <div
+          style={{
+            background: "#ffffff",
+            borderRadius: "10px",
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+          }}
+        >
+          <div style={{ background: "#dc2626", padding: "9px 14px", textAlign: "center", fontWeight: 700, fontSize: "12.5px", color: "#fff" }}>
+            INDIKASI GAMAS (TICKET ID)
           </div>
-        </div>
-
-        <div style={{ background: "#fff", padding: "16px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: "#2563eb", textTransform: "uppercase" }}>Distribusi Status</div>
-          <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
-            {analytics.statusList.slice(0, 3).map(([st, count]) => (
-              <div key={st} style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px" }}>
-                <span style={{ fontWeight: 600, color: "#334155" }}>{st}</span>
-                <span style={{ fontWeight: 700, color: "#2563eb" }}>{count}</span>
+          <div style={{ padding: "14px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div style={{ fontSize: "11.5px", color: "#64748b" }}>{globalStats.total} Total Tiket</div>
+            <div style={{ textAlign: "center", fontSize: "30px", fontWeight: 800, color: "#dc2626", margin: "8px 0" }}>
+              {globalStats.gamasCount}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div
+                onClick={() => setFilterGamas(filterGamas === "GAMAS" ? "ALL" : "GAMAS")}
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "6px",
+                  padding: "5px 10px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ color: "#b91c1c", fontWeight: 600 }}>Tiket Gamas</span>
+                <span style={{ color: "#7f1d1d", fontWeight: 800 }}>{globalStats.gamasCount}</span>
               </div>
-            ))}
+              <div
+                onClick={() => setFilterGamas(filterGamas === "NON_GAMAS" ? "ALL" : "NON_GAMAS")}
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "6px",
+                  padding: "5px 10px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ color: "#475569", fontWeight: 600 }}>Non-Gamas</span>
+                <span style={{ color: "#0f172a", fontWeight: 800 }}>{globalStats.nonGamasCount}</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div style={{ background: "#fff", padding: "16px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: "#059669", textTransform: "uppercase" }}>Service Type</div>
-          <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
-            {analytics.serviceTypeList.slice(0, 3).map(([srv, count]) => (
-              <div key={srv} style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px" }}>
-                <span style={{ fontWeight: 600, color: "#334155" }}>{srv}</span>
-                <span style={{ fontWeight: 700, color: "#059669" }}>{count}</span>
-              </div>
-            ))}
+        {/* KARTU 3: SEGMEN (HEADER KUNING/AMBER) */}
+        <div
+          style={{
+            background: "#ffffff",
+            borderRadius: "10px",
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+          }}
+        >
+          <div style={{ background: "#d97706", padding: "9px 14px", textAlign: "center", fontWeight: 700, fontSize: "12.5px", color: "#fff" }}>
+            SEGMEN
+          </div>
+          <div style={{ padding: "14px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div style={{ fontSize: "11.5px", color: "#64748b" }}>HVC: {globalStats.hvcCount} Tiket</div>
+            <div style={{ textAlign: "center", fontSize: "30px", fontWeight: 800, color: "#d97706", margin: "8px 0" }}>
+              {globalStats.total ? `${Math.round((globalStats.hvcCount / globalStats.total) * 100)}%` : "0%"}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px", maxHeight: "96px", overflowY: "auto" }}>
+              {globalStats.segmentList.map(([seg, count]) => (
+                <div
+                  key={seg}
+                  onClick={() => setFilterCustType(filterCustType === seg ? "ALL" : seg)}
+                  style={{
+                    background: "#fffbeb",
+                    border: "1px solid #fde68a",
+                    borderRadius: "6px",
+                    padding: "4px 10px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11.5px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ color: "#b45309", fontWeight: 600 }}>{seg}</span>
+                  <span style={{ color: "#78350f", fontWeight: 800 }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* KARTU 4: STATUS TIKET (HEADER BIRU) */}
+        <div
+          style={{
+            background: "#ffffff",
+            borderRadius: "10px",
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+          }}
+        >
+          <div style={{ background: "#2563eb", padding: "9px 14px", textAlign: "center", fontWeight: 700, fontSize: "12.5px", color: "#fff" }}>
+            STATUS TIKET
+          </div>
+          <div style={{ padding: "14px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div style={{ fontSize: "11.5px", color: "#64748b" }}>{globalStats.statusList.length} Kategori Status</div>
+            <div style={{ textAlign: "center", fontSize: "30px", fontWeight: 800, color: "#2563eb", margin: "8px 0" }}>
+              {globalStats.statusList[0]?.[1] || 0}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px", maxHeight: "96px", overflowY: "auto" }}>
+              {globalStats.statusList.map(([st, count]) => (
+                <div
+                  key={st}
+                  onClick={() => setFilterStatus(filterStatus === st ? "ALL" : st)}
+                  style={{
+                    background: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                    borderRadius: "6px",
+                    padding: "4px 10px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11.5px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ color: "#1d4ed8", fontWeight: 600 }}>{st}</span>
+                  <span style={{ color: "#1e3a8a", fontWeight: 800 }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* KARTU 5: SERVICE TYPE (HEADER HIJAU) */}
+        <div
+          style={{
+            background: "#ffffff",
+            borderRadius: "10px",
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+          }}
+        >
+          <div style={{ background: "#059669", padding: "9px 14px", textAlign: "center", fontWeight: 700, fontSize: "12.5px", color: "#fff" }}>
+            SERVICE TYPE
+          </div>
+          <div style={{ padding: "14px", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div style={{ fontSize: "11.5px", color: "#64748b" }}>{globalStats.serviceList.length} Jenis Layanan</div>
+            <div style={{ textAlign: "center", fontSize: "30px", fontWeight: 800, color: "#059669", margin: "8px 0" }}>
+              {globalStats.serviceList[0]?.[1] || 0}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px", maxHeight: "96px", overflowY: "auto" }}>
+              {globalStats.serviceList.map(([srv, count]) => (
+                <div
+                  key={srv}
+                  style={{
+                    background: "#ecfdf5",
+                    border: "1px solid #a7f3d0",
+                    borderRadius: "6px",
+                    padding: "4px 10px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11.5px",
+                  }}
+                >
+                  <span style={{ color: "#047857", fontWeight: 600 }}>{srv}</span>
+                  <span style={{ color: "#064e3b", fontWeight: 800 }}>{count}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* VISUAL BREAKDOWN PANELS */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "16px", marginBottom: "20px" }}>
-        {/* PANEL 1: SEBARAN PER WORKZONE */}
-        <div style={{ background: "#fff", padding: "18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <h2 style={{ fontSize: "14px", fontWeight: 700, margin: 0 }}>Sebaran Tiket per Workzone (STO)</h2>
-            <span style={{ fontSize: "11px", color: "#64748b" }}>Klik baris untuk filter</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "230px", overflowY: "auto" }}>
-            {analytics.workzoneList.map(([wz, count]) => {
-              const pct = analytics.total ? Math.round((count / analytics.total) * 100) : 0;
-              const isSelected = filterWorkzone === wz;
-              return (
-                <div
-                  key={wz}
-                  onClick={() => setFilterWorkzone(isSelected ? "ALL" : wz)}
-                  style={{ cursor: "pointer", padding: "4px 6px", borderRadius: "6px", background: isSelected ? "#eff6ff" : "transparent" }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", marginBottom: "3px" }}>
-                    <span style={{ fontWeight: 700, color: isSelected ? "#1d4ed8" : "#1e293b" }}>{wz}</span>
-                    <span style={{ color: "#475569", fontWeight: 600 }}>{count} ({pct}%)</span>
-                  </div>
-                  <div style={{ width: "100%", height: "7px", background: "#e2e8f0", borderRadius: "99px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: isSelected ? "#1d4ed8" : "#3b82f6", borderRadius: "99px" }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* PANEL 2: CUSTOMER TYPE BREAKDOWN */}
-        <div style={{ background: "#fff", padding: "18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <h2 style={{ fontSize: "14px", fontWeight: 700, margin: 0 }}>Breakdown Customer Type</h2>
-            <span style={{ fontSize: "11px", color: "#64748b" }}>Klik baris untuk filter</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "230px", overflowY: "auto" }}>
-            {analytics.custTypeList.map(([ct, count]) => {
-              const pct = analytics.total ? Math.round((count / analytics.total) * 100) : 0;
-              const isSelected = filterCustType === ct;
-              const barColor = ct.includes("PLATINUM") || ct.includes("DIAMOND") ? "#7c3aed" : ct.includes("GOLD") ? "#d97706" : "#0ea5e9";
-              return (
-                <div
-                  key={ct}
-                  onClick={() => setFilterCustType(isSelected ? "ALL" : ct)}
-                  style={{ cursor: "pointer", padding: "4px 6px", borderRadius: "6px", background: isSelected ? "#f8fafc" : "transparent" }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", marginBottom: "3px" }}>
-                    <span style={{ fontWeight: 700, color: "#1e293b" }}>{ct}</span>
-                    <span style={{ color: "#475569", fontWeight: 600 }}>{count} ({pct}%)</span>
-                  </div>
-                  <div style={{ width: "100%", height: "7px", background: "#e2e8f0", borderRadius: "99px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: "99px" }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* PANEL 3: TOP SYMPTOM GANGGUAN */}
-        <div style={{ background: "#fff", padding: "18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 12px 0" }}>Top Symptom Gangguan</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "230px", overflowY: "auto" }}>
-            {analytics.symptomList.map(([sym, count]) => {
-              const pct = analytics.total ? Math.round((count / analytics.total) * 100) : 0;
-              return (
-                <div key={sym} style={{ padding: "4px 0" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "3px", gap: "8px" }}>
-                    <span style={{ fontWeight: 600, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sym}>
-                      {sym}
-                    </span>
-                    <span style={{ color: "#475569", fontWeight: 700, whiteSpace: "nowrap" }}>{count} ({pct}%)</span>
-                  </div>
-                  <div style={{ width: "100%", height: "7px", background: "#e2e8f0", borderRadius: "99px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: "#6366f1", borderRadius: "99px" }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* 2 TABEL REKAP MATRIKS PER WITEL: WORKZONE X SEGMEN */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(520px, 1fr))",
+          gap: "18px",
+          marginBottom: "24px",
+        }}
+      >
+        {renderMatrixCard("REKAP TIKET WITEL JAKUT (WORKZONE × SEGMEN)", "JAKUT", jakutMatrix)}
+        {renderMatrixCard("REKAP TIKET WITEL JAKBAR (WORKZONE × SEGMEN)", "JAKBAR", jakbarMatrix)}
       </div>
 
-      {/* FILTER BAR & TABEL DETAIL 14 KOLOM */}
-      <div style={{ background: "#fff", padding: "16px 18px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
+      {/* TABEL DETAIL 14 KOLOM (DRILL-DOWN) */}
+      <div
+        style={{
+          background: "#ffffff",
+          padding: "16px 18px",
+          borderRadius: "10px",
+          border: "1px solid #e2e8f0",
+          boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "10px",
+            marginBottom: "14px",
+          }}
+        >
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-            <select value={filterWitel} onChange={(e) => setFilterWitel(e.target.value)} style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}>
+            <span style={{ fontWeight: 700, fontSize: "13.5px", color: "#0f172a", marginRight: "4px" }}>
+              DETAIL TIKET ({filteredData.length})
+            </span>
+
+            <select
+              value={filterWitel}
+              onChange={(e) => setFilterWitel(e.target.value)}
+              style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
+            >
               <option value="ALL">Semua Witel</option>
-              {filterOptions.witels.map((w) => <option key={w} value={w}>{w}</option>)}
+              {filterOptions.witels.map((w) => (
+                <option key={w} value={w}>{w}</option>
+              ))}
             </select>
 
-            <select value={filterWorkzone} onChange={(e) => setFilterWorkzone(e.target.value)} style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}>
+            <select
+              value={filterWorkzone}
+              onChange={(e) => setFilterWorkzone(e.target.value)}
+              style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
+            >
               <option value="ALL">Semua Workzone</option>
-              {filterOptions.workzones.map((wz) => <option key={wz} value={wz}>{wz}</option>)}
+              {filterOptions.workzones.map((wz) => (
+                <option key={wz} value={wz}>{wz}</option>
+              ))}
             </select>
 
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
+            >
               <option value="ALL">Semua Status</option>
-              {filterOptions.statuses.map((st) => <option key={st} value={st}>{st}</option>)}
+              {filterOptions.statuses.map((st) => (
+                <option key={st} value={st}>{st}</option>
+              ))}
             </select>
 
-            <select value={filterCustType} onChange={(e) => setFilterCustType(e.target.value)} style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}>
-              <option value="ALL">Semua Customer Type</option>
-              {filterOptions.custTypes.map((ct) => <option key={ct} value={ct}>{ct}</option>)}
+            <select
+              value={filterCustType}
+              onChange={(e) => setFilterCustType(e.target.value)}
+              style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
+            >
+              <option value="ALL">Semua Segmen</option>
+              {filterOptions.custTypes.map((ct) => (
+                <option key={ct} value={ct}>{ct}</option>
+              ))}
             </select>
 
-            <select value={filterGamas} onChange={(e) => setFilterGamas(e.target.value)} style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}>
-              <option value="ALL">Semua Gamas / Non-Gamas</option>
+            <select
+              value={filterGamas}
+              onChange={(e) => setFilterGamas(e.target.value)}
+              style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
+            >
+              <option value="ALL">Semua Gamas</option>
               <option value="GAMAS">Hanya Tiket Gamas</option>
               <option value="NON_GAMAS">Non-Gamas</option>
             </select>
 
-            {(filterWitel !== "ALL" || filterWorkzone !== "ALL" || filterStatus !== "ALL" || filterCustType !== "ALL" || filterGamas !== "ALL" || search !== "") && (
+            {(filterWitel !== "ALL" ||
+              filterWorkzone !== "ALL" ||
+              filterStatus !== "ALL" ||
+              filterCustType !== "ALL" ||
+              filterGamas !== "ALL" ||
+              search !== "") && (
               <button
                 type="button"
                 onClick={resetFilters}
-                style={{ background: "#fee2e2", color: "#b91c1c", border: "none", padding: "7px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                style={{
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  border: "none",
+                  padding: "7px 12px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
               >
                 Reset Filter
               </button>
@@ -406,11 +919,11 @@ export default function DashboardPage({
             placeholder="Cari INCIDENT / SERVICE NO / CUSTOMER / SYMPTOM..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", width: "310px", fontSize: "12.5px" }}
+            style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", width: "300px", fontSize: "12.5px" }}
           />
         </div>
 
-        <div style={{ overflowX: "auto", border: "1px solid #cbd5e1", borderRadius: "8px", maxHeight: "62vh" }}>
+        <div style={{ overflowX: "auto", border: "1px solid #cbd5e1", borderRadius: "8px", maxHeight: "58vh" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead style={{ background: "#f8fafc", position: "sticky", top: 0, zIndex: 1 }}>
               <tr>
@@ -446,19 +959,27 @@ export default function DashboardPage({
                     <td style={tdStyle}>{row.witel || "-"}</td>
                     <td style={{ ...tdStyle, fontWeight: 600 }}>{row.workzone || "-"}</td>
                     <td style={tdStyle}>
-                      <span style={{
-                        padding: "2px 8px",
-                        borderRadius: "99px",
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        background: row.status === "BACKEND" ? "#dbeafe" : row.status === "DRAFT" ? "#fef3c7" : "#f1f5f9",
-                        color: row.status === "BACKEND" ? "#1e40af" : row.status === "DRAFT" ? "#92400e" : "#334155",
-                      }}>
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: "99px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          background: row.status === "BACKEND" ? "#dbeafe" : row.status === "DRAFT" ? "#fef3c7" : "#f1f5f9",
+                          color: row.status === "BACKEND" ? "#1e40af" : row.status === "DRAFT" ? "#92400e" : "#334155",
+                        }}
+                      >
                         {row.status || "-"}
                       </span>
                     </td>
                     <td style={tdStyle}>{row.status_date || "-"}</td>
-                    <td style={{ ...tdStyle, color: row.ticket_id_gamas ? "#dc2626" : "#64748b", fontWeight: row.ticket_id_gamas ? 600 : 400 }}>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        color: row.ticket_id_gamas && row.ticket_id_gamas !== "-" ? "#dc2626" : "#64748b",
+                        fontWeight: row.ticket_id_gamas && row.ticket_id_gamas !== "-" ? 700 : 400,
+                      }}
+                    >
                       {row.ticket_id_gamas || "-"}
                     </td>
                     <td style={tdStyle}>{row.contact_phone || "-"}</td>
@@ -466,7 +987,10 @@ export default function DashboardPage({
                     <td style={tdStyle}>{row.customer_type || "-"}</td>
                     <td style={tdStyle}>{row.customer_name || "-"}</td>
                     <td style={tdStyle}>{row.service_no || "-"}</td>
-                    <td style={{ ...tdStyle, maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis" }} title={row.symptom}>
+                    <td
+                      style={{ ...tdStyle, maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis" }}
+                      title={row.symptom}
+                    >
                       {row.symptom || "-"}
                     </td>
                   </tr>

@@ -435,21 +435,32 @@ export default function DashboardPage({
   const jakutStroke = jakutPct * circumference;
   const jakbarStroke = jakbarPct * circumference;
 
-  // Component Reusable untuk Kartu Model Pill Bar (seperti gambar)
-  const renderPillCard = (params: {
+  // Component Reusable untuk Kartu Pill Bar + Header Kolom Jakbar | Jakut | Total
+  const renderPillMatrixCard = (params: {
     title: string;
     headerBg: string;
     bigValue: string | number;
     bigValueColor: string;
     bigValueFontSize?: string;
-    pillBg: string;
-    pillActiveBg: string;
-    pillBorder: string;
-    pillActiveBorder: string;
-    labelColor: string;
-    valueColor: string;
+    defaultPillBg: string;
+    defaultPillActiveBg: string;
+    defaultPillBorder: string;
+    defaultPillActiveBorder: string;
+    defaultLabelColor: string;
+    defaultValueColor: string;
     activeFilterValue?: string;
     rows: PillRowItem[];
+    rowStyleOverrides?: Record<
+      string,
+      {
+        pillBg: string;
+        pillActiveBg: string;
+        pillBorder: string;
+        pillActiveBorder: string;
+        labelColor: string;
+        valueColor: string;
+      }
+    >;
     onRowClick?: (label: string) => void;
   }) => {
     const {
@@ -457,15 +468,16 @@ export default function DashboardPage({
       headerBg,
       bigValue,
       bigValueColor,
-      bigValueFontSize = "32px",
-      pillBg,
-      pillActiveBg,
-      pillBorder,
-      pillActiveBorder,
-      labelColor,
-      valueColor,
+      bigValueFontSize = "34px",
+      defaultPillBg,
+      defaultPillActiveBg,
+      defaultPillBorder,
+      defaultPillActiveBorder,
+      defaultLabelColor,
+      defaultValueColor,
       activeFilterValue,
       rows,
+      rowStyleOverrides,
       onRowClick,
     } = params;
 
@@ -500,7 +512,7 @@ export default function DashboardPage({
         {/* Angka Besar Tengah */}
         <div
           style={{
-            padding: "14px 12px 10px 12px",
+            padding: "16px 12px 8px 12px",
             textAlign: "center",
             fontSize: bigValueFontSize,
             fontWeight: 800,
@@ -511,58 +523,107 @@ export default function DashboardPage({
           {bigValue}
         </div>
 
-        {/* Daftar Pill Bar per Kategori (Pertahankan model pill pada gambar) */}
-        <div
-          style={{
-            padding: "0 14px 14px 14px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "6px",
-          }}
-        >
-          {rows.map((r) => {
-            const isSelected = activeFilterValue === r.label;
-            return (
-              <div
-                key={r.label}
-                className="stat-pill"
-                onClick={() => onRowClick && onRowClick(r.label)}
-                style={{
-                  background: isSelected ? pillActiveBg : pillBg,
-                  border: isSelected ? `1.5px solid ${pillActiveBorder}` : `1px solid ${pillBorder}`,
-                  borderRadius: "7px",
-                  padding: "6px 12px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "8px",
-                  fontSize: "12.5px",
-                  cursor: onRowClick ? "pointer" : "default",
-                }}
-                title={onRowClick ? `Klik untuk filter ${r.label} (Jakbar: ${r.jakbar}, Jakut: ${r.jakut})` : undefined}
-              >
-                <span style={{ color: labelColor, fontWeight: 700 }}>{r.label}</span>
+        {/* Area Header Kolom (Jakbar | Jakut | Total) + Daftar Pill Bar */}
+        <div style={{ padding: "0 14px 14px 14px" }}>
+          {/* Baris Header Kolom Merah */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 52px 52px 52px",
+              alignItems: "center",
+              padding: "4px 12px 6px 12px",
+            }}
+          >
+            <span />
+            <span style={{ textAlign: "center", fontWeight: 700, fontSize: "11.5px", color: "#dc2626" }}>
+              Jakbar
+            </span>
+            <span style={{ textAlign: "center", fontWeight: 700, fontSize: "11.5px", color: "#dc2626" }}>
+              Jakut
+            </span>
+            <span style={{ textAlign: "center", fontWeight: 700, fontSize: "11.5px", color: "#dc2626" }}>
+              Total
+            </span>
+          </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {/* Daftar Baris Pill */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {rows.map((r) => {
+              const isSelected = activeFilterValue === r.label;
+              const styleCfg = rowStyleOverrides?.[r.label] || {
+                pillBg: defaultPillBg,
+                pillActiveBg: defaultPillActiveBg,
+                pillBorder: defaultPillBorder,
+                pillActiveBorder: defaultPillActiveBorder,
+                labelColor: defaultLabelColor,
+                valueColor: defaultValueColor,
+              };
+
+              return (
+                <div
+                  key={r.label}
+                  className="stat-pill"
+                  onClick={() => onRowClick && onRowClick(r.label)}
+                  style={{
+                    background: isSelected ? styleCfg.pillActiveBg : styleCfg.pillBg,
+                    border: isSelected
+                      ? `1.5px solid ${styleCfg.pillActiveBorder}`
+                      : `1px solid ${styleCfg.pillBorder}`,
+                    borderRadius: "7px",
+                    padding: "6px 12px",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 52px 52px 52px",
+                    alignItems: "center",
+                    fontSize: "12.5px",
+                    cursor: onRowClick ? "pointer" : "default",
+                  }}
+                  title={onRowClick ? `Klik untuk filter ${r.label}` : undefined}
+                >
                   <span
                     style={{
-                      fontSize: "10.5px",
-                      fontWeight: 600,
-                      color: "#64748b",
-                      background: "rgba(255,255,255,0.75)",
-                      padding: "1px 6px",
-                      borderRadius: "4px",
+                      color: styleCfg.labelColor,
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
                     }}
                   >
-                    JB:{r.jakbar} | JU:{r.jakut}
+                    {r.label}
                   </span>
-                  <span style={{ color: valueColor, fontWeight: 800, minWidth: "22px", textAlign: "right" }}>
+
+                  <span
+                    style={{
+                      textAlign: "center",
+                      fontWeight: r.jakbar > 0 ? 700 : 600,
+                      color: r.jakbar === 0 ? "#16a34a" : styleCfg.valueColor,
+                    }}
+                  >
+                    {r.jakbar}
+                  </span>
+
+                  <span
+                    style={{
+                      textAlign: "center",
+                      fontWeight: r.jakut > 0 ? 700 : 600,
+                      color: r.jakut === 0 ? "#16a34a" : styleCfg.valueColor,
+                    }}
+                  >
+                    {r.jakut}
+                  </span>
+
+                  <span
+                    style={{
+                      textAlign: "center",
+                      fontWeight: 800,
+                      color: r.total === 0 ? "#16a34a" : styleCfg.valueColor,
+                    }}
+                  >
                     {r.total}
                   </span>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
     );
@@ -861,7 +922,7 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* GRID 6 KARTU RINGKASAN (2 BARIS x 3 KOLOM - MODEL PILL BAR) */}
+      {/* GRID 6 KARTU RINGKASAN (2 BARIS x 3 KOLOM - PILL BAR + HEADER JAKBAR | JAKUT | TOTAL) */}
       <div className="kpi-cards-grid" style={{ marginBottom: "20px" }}>
         {/* KARTU 1: TOTAL TIKET AKTIF + DONUT CHART */}
         <div
@@ -881,7 +942,7 @@ export default function DashboardPage({
           </div>
 
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", margin: "10px 0" }}>
-            <svg width="108" height="108" viewBox="0 0 100 100">
+            <svg width="112" height="112" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="11" />
               {globalStats.total > 0 && (
                 <>
@@ -956,17 +1017,27 @@ export default function DashboardPage({
         </div>
 
         {/* KARTU 2: INDIKASI GAMAS (TICKET ID) */}
-        {renderPillCard({
+        {renderPillMatrixCard({
           title: "INDIKASI GAMAS (TICKET ID)",
           headerBg: "#e11d48",
           bigValue: globalStats.gamasTotal,
           bigValueColor: "#dc2626",
-          pillBg: "#fef2f2",
-          pillActiveBg: "#fee2e2",
-          pillBorder: "#fecaca",
-          pillActiveBorder: "#dc2626",
-          labelColor: "#b91c1c",
-          valueColor: "#7f1d1d",
+          defaultPillBg: "#fef2f2",
+          defaultPillActiveBg: "#fee2e2",
+          defaultPillBorder: "#fecaca",
+          defaultPillActiveBorder: "#dc2626",
+          defaultLabelColor: "#b91c1c",
+          defaultValueColor: "#7f1d1d",
+          rowStyleOverrides: {
+            "Non-Gamas": {
+              pillBg: "#f8fafc",
+              pillActiveBg: "#e2e8f0",
+              pillBorder: "#cbd5e1",
+              pillActiveBorder: "#475569",
+              labelColor: "#334155",
+              valueColor: "#0f172a",
+            },
+          },
           activeFilterValue:
             filterGamas === "GAMAS"
               ? "Tiket Gamas"
@@ -984,18 +1055,18 @@ export default function DashboardPage({
         })}
 
         {/* KARTU 3: SEGMEN */}
-        {renderPillCard({
+        {renderPillMatrixCard({
           title: "SEGMEN",
           headerBg: "#d97706",
           bigValue: `HVC : ${globalStats.hvcTotal} | REG : ${globalStats.regTotal}`,
           bigValueColor: "#d97706",
-          bigValueFontSize: "22px",
-          pillBg: "#fffbeb",
-          pillActiveBg: "#fef3c7",
-          pillBorder: "#fde68a",
-          pillActiveBorder: "#d97706",
-          labelColor: "#b45309",
-          valueColor: "#78350f",
+          bigValueFontSize: "23px",
+          defaultPillBg: "#fffbeb",
+          defaultPillActiveBg: "#fef3c7",
+          defaultPillBorder: "#fde68a",
+          defaultPillActiveBorder: "#d97706",
+          defaultLabelColor: "#b45309",
+          defaultValueColor: "#78350f",
           activeFilterValue: filterCustType !== "ALL" ? filterCustType : undefined,
           rows: globalStats.segmenRows,
           onRowClick: (label) => {
@@ -1004,17 +1075,17 @@ export default function DashboardPage({
         })}
 
         {/* KARTU 4: STATUS TIKET */}
-        {renderPillCard({
+        {renderPillMatrixCard({
           title: "STATUS TIKET",
           headerBg: "#2563eb",
           bigValue: globalStats.total,
           bigValueColor: "#2563eb",
-          pillBg: "#eff6ff",
-          pillActiveBg: "#dbeafe",
-          pillBorder: "#bfdbfe",
-          pillActiveBorder: "#2563eb",
-          labelColor: "#1d4ed8",
-          valueColor: "#1e3a8a",
+          defaultPillBg: "#eff6ff",
+          defaultPillActiveBg: "#dbeafe",
+          defaultPillBorder: "#bfdbfe",
+          defaultPillActiveBorder: "#2563eb",
+          defaultLabelColor: "#1d4ed8",
+          defaultValueColor: "#1e3a8a",
           activeFilterValue: filterStatus !== "ALL" ? filterStatus : undefined,
           rows: globalStats.statusRows,
           onRowClick: (label) => {
@@ -1023,32 +1094,32 @@ export default function DashboardPage({
         })}
 
         {/* KARTU 5: SERVICE TYPE */}
-        {renderPillCard({
+        {renderPillMatrixCard({
           title: "SERVICE TYPE",
           headerBg: "#059669",
           bigValue: globalStats.total,
           bigValueColor: "#059669",
-          pillBg: "#ecfdf5",
-          pillActiveBg: "#d1fae5",
-          pillBorder: "#a7f3d0",
-          pillActiveBorder: "#059669",
-          labelColor: "#047857",
-          valueColor: "#064e3b",
+          defaultPillBg: "#ecfdf5",
+          defaultPillActiveBg: "#d1fae5",
+          defaultPillBorder: "#a7f3d0",
+          defaultPillActiveBorder: "#059669",
+          defaultLabelColor: "#047857",
+          defaultValueColor: "#064e3b",
           rows: globalStats.serviceRows,
         })}
 
         {/* KARTU 6: STATUS MANJA */}
-        {renderPillCard({
+        {renderPillMatrixCard({
           title: "STATUS MANJA",
-          headerBg: "#16a34a",
+          headerBg: "#65a30d",
           bigValue: globalStats.total,
           bigValueColor: "#16a34a",
-          pillBg: "#f0fdf4",
-          pillActiveBg: "#dcfce7",
-          pillBorder: "#bbf7d0",
-          pillActiveBorder: "#16a34a",
-          labelColor: "#15803d",
-          valueColor: "#14532d",
+          defaultPillBg: "#f0fdf4",
+          defaultPillActiveBg: "#dcfce7",
+          defaultPillBorder: "#bbf7d0",
+          defaultPillActiveBorder: "#16a34a",
+          defaultLabelColor: "#15803d",
+          defaultValueColor: "#14532d",
           activeFilterValue: filterManja !== "ALL" ? filterManja : undefined,
           rows: globalStats.manjaRows,
           onRowClick: (label) => {

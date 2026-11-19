@@ -87,7 +87,7 @@ export default function App() {
             NORTHERN JKT
           </span>
           <span style={{ fontWeight: 700, fontSize: "14px", color: "#f8fafc" }}>
-            Dashboard Laporan Tiket Gangguan
+            Laporan Tiket Gangguan
           </span>
         </div>
 
@@ -108,7 +108,7 @@ export default function App() {
               transition: "all 0.15s ease",
             }}
           >
-            Dashboard KPI
+            Dashboard Tiket Berjalan
           </button>
 
           <button

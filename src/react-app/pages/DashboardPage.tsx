@@ -824,8 +824,8 @@ export default function DashboardPage({
 
       {/* 2 TABEL REKAP MATRIKS PER WITEL: WORKZONE X SEGMEN */}
       <div className="matrix-tables-grid" style={{ marginBottom: "20px" }}>
-        {renderMatrixCard("REKAP TIKET WITEL JAKUT (WORKZONE × SEGMEN)", "JAKUT", jakutMatrix)}
-        {renderMatrixCard("REKAP TIKET WITEL JAKBAR (WORKZONE × SEGMEN)", "JAKBAR", jakbarMatrix)}
+        {renderMatrixCard("REKAP TIKET WITEL JAKUT", "JAKUT", jakutMatrix)}
+        {renderMatrixCard("REKAP TIKET WITEL JAKBAR", "JAKBAR", jakbarMatrix)}
       </div>
 
       {/* TABEL DETAIL 14 KOLOM (DRILL-DOWN) */}

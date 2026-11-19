@@ -647,16 +647,16 @@ export default function DashboardPage({
     document.body.removeChild(link);
   };
 
-  // Donut Chart SVG Calculation (Executive Emerald & Navy)
-  const radius = 34;
+  // Donut Chart SVG Calculation
+  const radius = 33;
   const circumference = 2 * Math.PI * radius;
   const jakutPct = globalStats.total ? globalStats.jakutCount / globalStats.total : 0;
   const jakbarPct = globalStats.total ? globalStats.jakbarCount / globalStats.total : 0;
   const jakutStroke = jakutPct * circumference;
   const jakbarStroke = jakbarPct * circumference;
 
-  // Kartu KPI Executive Formal (Seragam Slate Navy + Micro-Table Hairline)
-  const renderExecutiveCard = (params: {
+  // Kartu KPI Sidebar Kiri (Compact Executive Card)
+  const renderSidebarKpiCard = (params: {
     title: string;
     bigValue: React.ReactNode;
     bigValueColor?: string;
@@ -677,7 +677,7 @@ export default function DashboardPage({
       title,
       bigValue,
       bigValueColor = "#0f172a",
-      bigValueFontSize = "20px",
+      bigValueFontSize = "18px",
       activeFilterValue,
       rows,
       rowHighlightMap,
@@ -689,7 +689,7 @@ export default function DashboardPage({
         className="kpi-card"
         style={{
           background: "#ffffff",
-          borderRadius: "8px",
+          borderRadius: "7px",
           border: "1px solid #cbd5e1",
           overflow: "hidden",
           display: "flex",
@@ -698,26 +698,27 @@ export default function DashboardPage({
           boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
         }}
       >
-        {/* Header Kartu Seragam Slate Navy */}
         <div
           style={{
             background: "#1e293b",
-            padding: "4.5px 10px",
+            padding: "4px 6px",
             textAlign: "center",
             fontWeight: 700,
-            fontSize: "9.5px",
+            fontSize: "9px",
             color: "#f8fafc",
-            letterSpacing: "0.5px",
+            letterSpacing: "0.4px",
             textTransform: "uppercase",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {title}
         </div>
 
-        {/* Angka Utama / Executive Summary Metric */}
         <div
           style={{
-            padding: "6px 8px 4px 8px",
+            padding: "5px 4px 3px 4px",
             textAlign: "center",
             fontSize: bigValueFontSize,
             fontWeight: 800,
@@ -729,26 +730,24 @@ export default function DashboardPage({
           {bigValue}
         </div>
 
-        {/* Tabel Mikro dengan Garis Pembatas Halus (Hairline Divider) */}
-        <div style={{ padding: "0 8px 6px 8px" }}>
+        <div style={{ padding: "0 6px 5px 6px" }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 34px 34px 36px",
+              gridTemplateColumns: "1fr 22px 22px 26px",
               alignItems: "center",
-              padding: "2px 4px 3px 4px",
+              padding: "1px 2px 2px 2px",
               borderBottom: "1px solid #cbd5e1",
-              fontSize: "9px",
+              fontSize: "8px",
               fontWeight: 700,
               color: "#64748b",
               textTransform: "uppercase",
-              letterSpacing: "0.2px",
             }}
           >
             <span />
-            <span style={{ textAlign: "right" }}>Jakbar</span>
-            <span style={{ textAlign: "right" }}>Jakut</span>
-            <span style={{ textAlign: "right", color: "#0f172a" }}>Total</span>
+            <span style={{ textAlign: "right" }}>JKB</span>
+            <span style={{ textAlign: "right" }}>JKT</span>
+            <span style={{ textAlign: "right", color: "#0f172a" }}>TOT</span>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column" }}>
@@ -765,17 +764,17 @@ export default function DashboardPage({
                   onClick={() => onRowClick && onRowClick(r.label)}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 34px 34px 36px",
+                    gridTemplateColumns: "1fr 22px 22px 26px",
                     alignItems: "center",
-                    padding: "3px 4px",
+                    padding: "2.5px 2px",
                     borderBottom: isLast ? "none" : "1px solid #f1f5f9",
                     background: isSelected
                       ? "#eff6ff"
                       : hasAlertBg
                       ? customStyle.alertBg
                       : "transparent",
-                    borderRadius: isSelected || hasAlertBg ? "4px" : "0",
-                    fontSize: "10.5px",
+                    borderRadius: isSelected || hasAlertBg ? "3px" : "0",
+                    fontSize: "9.5px",
                     cursor: onRowClick ? "pointer" : "default",
                   }}
                   title={onRowClick ? `Klik untuk filter ${r.label}` : undefined}
@@ -791,9 +790,10 @@ export default function DashboardPage({
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
+                      paddingRight: "2px",
                     }}
                   >
-                    {r.label}
+                    {r.label.replace("HVC_", "")}
                   </span>
 
                   <span
@@ -842,7 +842,7 @@ export default function DashboardPage({
     );
   };
 
-  // Component Tabel Matriks Executive Formal: SEGMEN | STATUS MANJA | TTR
+  // Component Tabel Matriks Kolom Kanan: SEGMEN | STATUS MANJA | TTR
   const renderMatrixCard = (
     title: string,
     witelCode: string,
@@ -869,11 +869,10 @@ export default function DashboardPage({
           flexDirection: "column",
         }}
       >
-        {/* Header Biru Korporat Formal */}
         <div
           style={{
             background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)",
-            padding: "6px 12px",
+            padding: "5.5px 12px",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -883,7 +882,7 @@ export default function DashboardPage({
           <span
             style={{
               fontWeight: 700,
-              fontSize: "11.5px",
+              fontSize: "11px",
               color: "#ffffff",
               letterSpacing: "0.3px",
             }}
@@ -894,9 +893,9 @@ export default function DashboardPage({
             style={{
               background: "rgba(255,255,255,0.16)",
               border: "1px solid rgba(255,255,255,0.28)",
-              padding: "1.5px 9px",
+              padding: "1px 8px",
               borderRadius: "99px",
-              fontSize: "10.5px",
+              fontSize: "10px",
               fontWeight: 700,
               color: "#ffffff",
               whiteSpace: "nowrap",
@@ -913,11 +912,11 @@ export default function DashboardPage({
                 <th
                   rowSpan={2}
                   style={{
-                    padding: "4px 6px",
-                    fontSize: "10px",
+                    padding: "4px 5px",
+                    fontSize: "9.5px",
                     fontWeight: 700,
                     color: "#475569",
-                    width: "34px",
+                    width: "30px",
                     textAlign: "center",
                     borderBottom: "2px solid #cbd5e1",
                   }}
@@ -927,11 +926,11 @@ export default function DashboardPage({
                 <th
                   rowSpan={2}
                   style={{
-                    padding: "4px 8px",
-                    fontSize: "10px",
+                    padding: "4px 7px",
+                    fontSize: "9.5px",
                     fontWeight: 700,
                     color: "#475569",
-                    width: "92px",
+                    width: "76px",
                     borderBottom: "2px solid #cbd5e1",
                   }}
                 >
@@ -941,12 +940,12 @@ export default function DashboardPage({
                   colSpan={matrixSegments.length + 1}
                   style={{
                     padding: "3.5px 4px",
-                    fontSize: "10px",
+                    fontSize: "9.5px",
                     fontWeight: 800,
                     color: "#1e293b",
                     textAlign: "center",
                     borderBottom: "1px solid #cbd5e1",
-                    letterSpacing: "0.4px",
+                    letterSpacing: "0.3px",
                     ...groupDividerLeft,
                   }}
                 >
@@ -957,12 +956,12 @@ export default function DashboardPage({
                   colSpan={2}
                   style={{
                     padding: "3.5px 4px",
-                    fontSize: "10px",
+                    fontSize: "9.5px",
                     fontWeight: 800,
                     color: "#1e293b",
                     textAlign: "center",
                     borderBottom: "1px solid #cbd5e1",
-                    letterSpacing: "0.4px",
+                    letterSpacing: "0.3px",
                     ...groupDividerLeft,
                   }}
                 >
@@ -973,12 +972,12 @@ export default function DashboardPage({
                   colSpan={3}
                   style={{
                     padding: "3.5px 4px",
-                    fontSize: "10px",
+                    fontSize: "9.5px",
                     fontWeight: 800,
                     color: "#1e293b",
                     textAlign: "center",
                     borderBottom: "1px solid #cbd5e1",
-                    letterSpacing: "0.4px",
+                    letterSpacing: "0.3px",
                     ...groupDividerLeft,
                   }}
                 >
@@ -993,7 +992,7 @@ export default function DashboardPage({
                     title={seg}
                     style={{
                       padding: "3.5px 4px",
-                      fontSize: "10px",
+                      fontSize: "9.5px",
                       fontWeight: 700,
                       color: "#475569",
                       textAlign: "center",
@@ -1007,12 +1006,12 @@ export default function DashboardPage({
                 ))}
                 <th
                   style={{
-                    padding: "3.5px 6px",
-                    fontSize: "10px",
+                    padding: "3.5px 5px",
+                    fontSize: "9.5px",
                     fontWeight: 800,
                     color: "#1e3a8a",
                     textAlign: "center",
-                    width: "54px",
+                    width: "48px",
                     background: "#eff6ff",
                     borderBottom: "2px solid #cbd5e1",
                   }}
@@ -1022,8 +1021,8 @@ export default function DashboardPage({
 
                 <th
                   style={{
-                    padding: "3.5px 6px",
-                    fontSize: "10px",
+                    padding: "3.5px 5px",
+                    fontSize: "9.5px",
                     fontWeight: 700,
                     color: "#475569",
                     textAlign: "center",
@@ -1036,8 +1035,8 @@ export default function DashboardPage({
                 </th>
                 <th
                   style={{
-                    padding: "3.5px 6px",
-                    fontSize: "10px",
+                    padding: "3.5px 5px",
+                    fontSize: "9.5px",
                     fontWeight: 700,
                     color: "#475569",
                     textAlign: "center",
@@ -1050,8 +1049,8 @@ export default function DashboardPage({
 
                 <th
                   style={{
-                    padding: "3.5px 6px",
-                    fontSize: "10px",
+                    padding: "3.5px 5px",
+                    fontSize: "9.5px",
                     fontWeight: 700,
                     color: "#475569",
                     textAlign: "center",
@@ -1064,8 +1063,8 @@ export default function DashboardPage({
                 </th>
                 <th
                   style={{
-                    padding: "3.5px 6px",
-                    fontSize: "10px",
+                    padding: "3.5px 5px",
+                    fontSize: "9.5px",
                     fontWeight: 700,
                     color: "#b45309",
                     textAlign: "center",
@@ -1077,8 +1076,8 @@ export default function DashboardPage({
                 </th>
                 <th
                   style={{
-                    padding: "3.5px 6px",
-                    fontSize: "10px",
+                    padding: "3.5px 5px",
+                    fontSize: "9.5px",
                     fontWeight: 800,
                     color: "#b91c1c",
                     textAlign: "center",
@@ -1143,8 +1142,8 @@ export default function DashboardPage({
                   >
                     <td
                       style={{
-                        padding: "3.5px 6px",
-                        fontSize: "11px",
+                        padding: "3.5px 5px",
+                        fontSize: "10.5px",
                         fontWeight: 500,
                         color: "#64748b",
                         textAlign: "center",
@@ -1155,8 +1154,8 @@ export default function DashboardPage({
                     </td>
                     <td
                       style={{
-                        padding: "3.5px 8px",
-                        fontSize: "11.5px",
+                        padding: "3.5px 7px",
+                        fontSize: "11px",
                         fontWeight: 700,
                         color: isSelected ? "#1d4ed8" : "#0f172a",
                         borderBottom: "1px solid #e2e8f0",
@@ -1173,7 +1172,7 @@ export default function DashboardPage({
                           key={seg}
                           style={{
                             padding: "3.5px 4px",
-                            fontSize: "11.5px",
+                            fontSize: "11px",
                             textAlign: "center",
                             fontVariantNumeric: "tabular-nums",
                             borderBottom: "1px solid #e2e8f0",
@@ -1188,7 +1187,7 @@ export default function DashboardPage({
 
                     <td
                       style={{
-                        padding: "3.5px 6px",
+                        padding: "3.5px 5px",
                         textAlign: "center",
                         background: isSelected ? "#bfdbfe" : "#f8fafc",
                         borderBottom: "1px solid #e2e8f0",
@@ -1207,11 +1206,11 @@ export default function DashboardPage({
                             ? "#1e3a8a"
                             : "#cbd5e1",
                           fontWeight: row.rowTotal > 0 ? 800 : 400,
-                          fontSize: "11px",
-                          padding: "1px 8px",
+                          fontSize: "10.5px",
+                          padding: "1px 7px",
                           borderRadius: "4px",
                           display: "inline-block",
-                          minWidth: "24px",
+                          minWidth: "22px",
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
@@ -1222,8 +1221,8 @@ export default function DashboardPage({
                     <td
                       onClick={(e) => applyCellFilter(e, { manja: "ANY_MANJA" })}
                       style={{
-                        padding: "3.5px 6px",
-                        fontSize: "11.5px",
+                        padding: "3.5px 5px",
+                        fontSize: "11px",
                         textAlign: "center",
                         fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
@@ -1238,8 +1237,8 @@ export default function DashboardPage({
                     <td
                       onClick={(e) => applyCellFilter(e, { manja: "NON MANJA" })}
                       style={{
-                        padding: "3.5px 6px",
-                        fontSize: "11.5px",
+                        padding: "3.5px 5px",
+                        fontSize: "11px",
                         textAlign: "center",
                         fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
@@ -1253,8 +1252,8 @@ export default function DashboardPage({
                     <td
                       onClick={(e) => applyCellFilter(e, { ttr: "IN SLA" })}
                       style={{
-                        padding: "3.5px 6px",
-                        fontSize: "11.5px",
+                        padding: "3.5px 5px",
+                        fontSize: "11px",
                         textAlign: "center",
                         fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
@@ -1269,8 +1268,8 @@ export default function DashboardPage({
                     <td
                       onClick={(e) => applyCellFilter(e, { ttr: "SLA Kritis" })}
                       style={{
-                        padding: "3.5px 6px",
-                        fontSize: "11.5px",
+                        padding: "3.5px 5px",
+                        fontSize: "11px",
                         textAlign: "center",
                         fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
@@ -1285,8 +1284,8 @@ export default function DashboardPage({
                     <td
                       onClick={(e) => applyCellFilter(e, { ttr: "TTR Expired" })}
                       style={{
-                        padding: "3.5px 6px",
-                        fontSize: "11.5px",
+                        padding: "3.5px 5px",
+                        fontSize: "11px",
                         textAlign: "center",
                         fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
@@ -1306,12 +1305,11 @@ export default function DashboardPage({
                 <td
                   colSpan={2}
                   style={{
-                    padding: "5px 8px",
-                    fontSize: "11px",
+                    padding: "4.5px 7px",
+                    fontSize: "10.5px",
                     fontWeight: 800,
                     color: "#0f172a",
                     borderTop: "2px solid #94a3b8",
-                    letterSpacing: "0.2px",
                   }}
                 >
                   GRAND TOTAL {witelCode}
@@ -1323,8 +1321,8 @@ export default function DashboardPage({
                     <td
                       key={seg}
                       style={{
-                        padding: "5px 4px",
-                        fontSize: "11.5px",
+                        padding: "4.5px 4px",
+                        fontSize: "11px",
                         textAlign: "center",
                         fontVariantNumeric: "tabular-nums",
                         borderTop: "2px solid #94a3b8",
@@ -1339,7 +1337,7 @@ export default function DashboardPage({
 
                 <td
                   style={{
-                    padding: "5px 6px",
+                    padding: "4.5px 5px",
                     textAlign: "center",
                     borderTop: "2px solid #94a3b8",
                   }}
@@ -1349,11 +1347,11 @@ export default function DashboardPage({
                       background: "#1e3a8a",
                       color: "#ffffff",
                       fontWeight: 800,
-                      fontSize: "11px",
-                      padding: "1.5px 9px",
+                      fontSize: "10.5px",
+                      padding: "1px 8px",
                       borderRadius: "4px",
                       display: "inline-block",
-                      minWidth: "26px",
+                      minWidth: "24px",
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
@@ -1363,8 +1361,8 @@ export default function DashboardPage({
 
                 <td
                   style={{
-                    padding: "5px 6px",
-                    fontSize: "11.5px",
+                    padding: "4.5px 5px",
+                    fontSize: "11px",
                     textAlign: "center",
                     fontVariantNumeric: "tabular-nums",
                     borderTop: "2px solid #94a3b8",
@@ -1376,8 +1374,8 @@ export default function DashboardPage({
                 </td>
                 <td
                   style={{
-                    padding: "5px 6px",
-                    fontSize: "11.5px",
+                    padding: "4.5px 5px",
+                    fontSize: "11px",
                     textAlign: "center",
                     fontVariantNumeric: "tabular-nums",
                     borderTop: "2px solid #94a3b8",
@@ -1389,8 +1387,8 @@ export default function DashboardPage({
 
                 <td
                   style={{
-                    padding: "5px 6px",
-                    fontSize: "11.5px",
+                    padding: "4.5px 5px",
+                    fontSize: "11px",
                     textAlign: "center",
                     fontVariantNumeric: "tabular-nums",
                     borderTop: "2px solid #94a3b8",
@@ -1402,8 +1400,8 @@ export default function DashboardPage({
                 </td>
                 <td
                   style={{
-                    padding: "5px 6px",
-                    fontSize: "11.5px",
+                    padding: "4.5px 5px",
+                    fontSize: "11px",
                     textAlign: "center",
                     fontVariantNumeric: "tabular-nums",
                     borderTop: "2px solid #94a3b8",
@@ -1415,8 +1413,8 @@ export default function DashboardPage({
                 </td>
                 <td
                   style={{
-                    padding: "5px 6px",
-                    fontSize: "11.5px",
+                    padding: "4.5px 5px",
+                    fontSize: "11px",
                     textAlign: "center",
                     fontVariantNumeric: "tabular-nums",
                     borderTop: "2px solid #94a3b8",
@@ -1452,25 +1450,25 @@ export default function DashboardPage({
   };
 
   return (
-    <div style={{ width: "100%", maxWidth: "1180px", margin: "0 auto", padding: "8px 12px" }}>
+    <div style={{ width: "100%", maxWidth: "1260px", margin: "0 auto", padding: "8px 12px" }}>
       {/* HEADER BAR EXECUTIVE FORMAL */}
       <div
         style={{
           background: "#ffffff",
           border: "1px solid #cbd5e1",
           borderRadius: "8px",
-          padding: "9px 16px",
+          padding: "8px 14px",
           marginBottom: "8px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           flexWrap: "wrap",
-          gap: "10px",
+          gap: "8px",
           boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>
+          <h1 style={{ margin: 0, fontSize: "16.5px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>
             Monitoring Gangguan Branch Northern Jakarta – {todayTitle}
           </h1>
           <div style={{ fontSize: "11.5px", color: "#64748b", marginTop: "2px" }}>
@@ -1516,278 +1514,280 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* GRID BENTO EXECUTIVE */}
-      <div className="kpi-bento-grid" style={{ marginBottom: "8px" }}>
-        {/* KARTU 1 (SPAN 2 BARIS): TOTAL TIKET AKTIF + DONUT CHART */}
-        <div
-          className="kpi-card kpi-hero-card"
-          style={{
-            background: "#ffffff",
-            borderRadius: "8px",
-            border: "1px solid #cbd5e1",
-            overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-          }}
-        >
+      {/* ASYMMETRIC SPLIT LAYOUT: KIRI (KPI SIDEBAR) | KANAN (TABEL MATRIKS JAKUT & JAKBAR) */}
+      <div className="exec-split-layout" style={{ marginBottom: "10px" }}>
+        {/* KOLOM KIRI: HERO CARD + 6 KARTU KPI (2x3) */}
+        <div className="exec-left-kpi-col">
+          {/* HERO CARD: TOTAL TIKET AKTIF */}
           <div
+            className="kpi-card"
             style={{
-              background: "#1e293b",
-              padding: "4.5px 10px",
-              textAlign: "center",
-              fontWeight: 700,
-              fontSize: "9.5px",
-              color: "#f8fafc",
-              letterSpacing: "0.5px",
+              background: "#ffffff",
+              borderRadius: "8px",
+              border: "1px solid #cbd5e1",
+              overflow: "hidden",
+              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
             }}
           >
-            TOTAL TIKET AKTIF
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", margin: "6px 0" }}>
-            <svg width="112" height="112" viewBox="0 0 88 88">
-              <circle cx="44" cy="44" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="9" />
-              {globalStats.total > 0 && (
-                <>
-                  <circle
-                    cx="44"
-                    cy="44"
-                    r={radius}
-                    fill="transparent"
-                    stroke="#0d9488"
-                    strokeWidth="9"
-                    strokeDasharray={`${jakutStroke} ${circumference}`}
-                    transform="rotate(-90 44 44)"
-                  />
-                  <circle
-                    cx="44"
-                    cy="44"
-                    r={radius}
-                    fill="transparent"
-                    stroke="#1e3a8a"
-                    strokeWidth="9"
-                    strokeDasharray={`${jakbarStroke} ${circumference}`}
-                    strokeDashoffset={-jakutStroke}
-                    transform="rotate(-90 44 44)"
-                  />
-                </>
-              )}
-              <text x="44" y="42" textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="800">
-                {globalStats.total}
-              </text>
-              <text x="44" y="54" textAnchor="middle" fill="#64748b" fontSize="6.8" fontWeight="700">
-                OPEN TIKET
-              </text>
-            </svg>
-          </div>
-
-          <div style={{ padding: "0 10px 8px 10px", display: "flex", flexDirection: "column" }}>
             <div
-              className="exec-metric-row"
-              onClick={() => setFilterWitel(filterWitel === "JAKBAR" ? "ALL" : "JAKBAR")}
               style={{
-                background: filterWitel === "JAKBAR" ? "#eff6ff" : "transparent",
-                borderTop: "1px solid #e2e8f0",
-                borderBottom: "1px solid #e2e8f0",
-                padding: "5px 4px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                fontSize: "11px",
-                cursor: "pointer",
+                background: "#1e293b",
+                padding: "4.5px 10px",
+                textAlign: "center",
+                fontWeight: 700,
+                fontSize: "9.5px",
+                color: "#f8fafc",
+                letterSpacing: "0.5px",
               }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e293b", fontWeight: 700 }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#1e3a8a", display: "inline-block" }} />
-                Witel JAKBAR
-              </span>
-              <span style={{ color: "#0f172a", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-                {globalStats.jakbarCount}{" "}
-                <span style={{ color: "#64748b", fontWeight: 600, fontSize: "10px" }}>
-                  ({globalStats.jakbarSharePct}%)
-                </span>
-              </span>
+              TOTAL TIKET AKTIF
             </div>
 
             <div
-              className="exec-metric-row"
-              onClick={() => setFilterWitel(filterWitel === "JAKUT" ? "ALL" : "JAKUT")}
               style={{
-                background: filterWitel === "JAKUT" ? "#f0fdfa" : "transparent",
-                padding: "5px 4px",
+                padding: "10px 12px",
                 display: "flex",
-                justifyContent: "space-between",
                 alignItems: "center",
-                fontSize: "11px",
-                cursor: "pointer",
+                justifyContent: "space-between",
+                gap: "12px",
               }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e293b", fontWeight: 700 }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#0d9488", display: "inline-block" }} />
-                Witel JAKUT
-              </span>
-              <span style={{ color: "#0f172a", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-                {globalStats.jakutCount}{" "}
-                <span style={{ color: "#64748b", fontWeight: 600, fontSize: "10px" }}>
-                  ({globalStats.jakutSharePct}%)
-                </span>
-              </span>
+              <svg width="96" height="96" viewBox="0 0 88 88" style={{ flexShrink: 0 }}>
+                <circle cx="44" cy="44" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="9" />
+                {globalStats.total > 0 && (
+                  <>
+                    <circle
+                      cx="44"
+                      cy="44"
+                      r={radius}
+                      fill="transparent"
+                      stroke="#0d9488"
+                      strokeWidth="9"
+                      strokeDasharray={`${jakutStroke} ${circumference}`}
+                      transform="rotate(-90 44 44)"
+                    />
+                    <circle
+                      cx="44"
+                      cy="44"
+                      r={radius}
+                      fill="transparent"
+                      stroke="#1e3a8a"
+                      strokeWidth="9"
+                      strokeDasharray={`${jakbarStroke} ${circumference}`}
+                      strokeDashoffset={-jakutStroke}
+                      transform="rotate(-90 44 44)"
+                    />
+                  </>
+                )}
+                <text x="44" y="42" textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="800">
+                  {globalStats.total}
+                </text>
+                <text x="44" y="54" textAnchor="middle" fill="#64748b" fontSize="6.8" fontWeight="700">
+                  OPEN TIKET
+                </text>
+              </svg>
+
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                <div
+                  className="exec-metric-row"
+                  onClick={() => setFilterWitel(filterWitel === "JAKBAR" ? "ALL" : "JAKBAR")}
+                  style={{
+                    background: filterWitel === "JAKBAR" ? "#eff6ff" : "transparent",
+                    borderBottom: "1px solid #e2e8f0",
+                    padding: "6px 4px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e293b", fontWeight: 700 }}>
+                    <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#1e3a8a", display: "inline-block" }} />
+                    Witel JAKBAR
+                  </span>
+                  <span style={{ color: "#0f172a", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                    {globalStats.jakbarCount}{" "}
+                    <span style={{ color: "#64748b", fontWeight: 600, fontSize: "10px" }}>
+                      ({globalStats.jakbarSharePct}%)
+                    </span>
+                  </span>
+                </div>
+
+                <div
+                  className="exec-metric-row"
+                  onClick={() => setFilterWitel(filterWitel === "JAKUT" ? "ALL" : "JAKUT")}
+                  style={{
+                    background: filterWitel === "JAKUT" ? "#f0fdfa" : "transparent",
+                    padding: "6px 4px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e293b", fontWeight: 700 }}>
+                    <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#0d9488", display: "inline-block" }} />
+                    Witel JAKUT
+                  </span>
+                  <span style={{ color: "#0f172a", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                    {globalStats.jakutCount}{" "}
+                    <span style={{ color: "#64748b", fontWeight: 600, fontSize: "10px" }}>
+                      ({globalStats.jakutSharePct}%)
+                    </span>
+                  </span>
+                </div>
+              </div>
             </div>
+          </div>
+
+          {/* 6 KARTU KPI MINI (2 KOLOM x 3 BARIS) */}
+          <div className="exec-mini-kpi-grid">
+            {/* 1. INDIKASI GAMAS */}
+            {renderSidebarKpiCard({
+              title: "INDIKASI GAMAS",
+              bigValue: globalStats.gamasTotal,
+              bigValueColor: globalStats.gamasTotal > 0 ? "#b91c1c" : "#0f172a",
+              rowHighlightMap: {
+                "Tiket Gamas": {
+                  labelColor: "#b91c1c",
+                  valueColor: "#b91c1c",
+                  alertBg: "#fef2f2",
+                },
+              },
+              activeFilterValue:
+                filterGamas === "GAMAS"
+                  ? "Tiket Gamas"
+                  : filterGamas === "NON_GAMAS"
+                  ? "Non-Gamas"
+                  : undefined,
+              rows: globalStats.gamasRows,
+              onRowClick: (label) => {
+                if (label === "Tiket Gamas") {
+                  setFilterGamas(filterGamas === "GAMAS" ? "ALL" : "GAMAS");
+                } else {
+                  setFilterGamas(filterGamas === "NON_GAMAS" ? "ALL" : "NON_GAMAS");
+                }
+              },
+            })}
+
+            {/* 2. SEGMEN PELANGGAN */}
+            {renderSidebarKpiCard({
+              title: "SEGMEN PELANGGAN",
+              bigValue: (
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "#0f172a" }}>
+                  HVC: {globalStats.hvcTotal} ({globalStats.hvcSharePct}%) | REG: {globalStats.regTotal}
+                </span>
+              ),
+              bigValueFontSize: "11px",
+              activeFilterValue: filterCustType !== "ALL" ? filterCustType : undefined,
+              rows: globalStats.segmenRows,
+              onRowClick: (label) => {
+                setFilterCustType(filterCustType === label ? "ALL" : label);
+              },
+            })}
+
+            {/* 3. STATUS TIKET */}
+            {renderSidebarKpiCard({
+              title: "STATUS TIKET",
+              bigValue: globalStats.total,
+              bigValueColor: "#1e3a8a",
+              activeFilterValue: filterStatus !== "ALL" ? filterStatus : undefined,
+              rows: globalStats.statusRows,
+              onRowClick: (label) => {
+                setFilterStatus(filterStatus === label ? "ALL" : label);
+              },
+            })}
+
+            {/* 4. SERVICE TYPE */}
+            {renderSidebarKpiCard({
+              title: "SERVICE TYPE",
+              bigValue: globalStats.total,
+              bigValueColor: "#0f172a",
+              rows: globalStats.serviceRows,
+            })}
+
+            {/* 5. STATUS MANJA */}
+            {renderSidebarKpiCard({
+              title: "STATUS MANJA",
+              bigValue: globalStats.total,
+              bigValueColor: "#0f172a",
+              rowHighlightMap: {
+                "MANJA EXPIRED": {
+                  labelColor: "#b91c1c",
+                  valueColor: "#b91c1c",
+                  alertBg: "#fef2f2",
+                },
+              },
+              activeFilterValue: filterManja !== "ALL" ? filterManja : undefined,
+              rows: globalStats.manjaRows,
+              onRowClick: (label) => {
+                setFilterManja(filterManja === label ? "ALL" : label);
+              },
+            })}
+
+            {/* 6. STATUS TTR (SLA) */}
+            {renderSidebarKpiCard({
+              title: "STATUS TTR (SLA)",
+              bigValue: (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a" }}>
+                    {globalStats.inSlaRatePct}%{" "}
+                    <span style={{ fontSize: "9.5px", fontWeight: 700, color: "#0d9488" }}>SLA</span>
+                  </span>
+                  {globalStats.ttrExpiredTotal > 0 && (
+                    <span
+                      style={{
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                        border: "1px solid #fecaca",
+                        fontSize: "9px",
+                        fontWeight: 800,
+                        padding: "0.5px 4px",
+                        borderRadius: "3px",
+                      }}
+                    >
+                      {globalStats.ttrExpiredTotal} Exp
+                    </span>
+                  )}
+                </div>
+              ),
+              bigValueFontSize: "14px",
+              rowHighlightMap: {
+                "SLA Kritis": {
+                  labelColor: "#b45309",
+                  valueColor: "#b45309",
+                  alertBg: "#fffbeb",
+                },
+                "TTR Expired": {
+                  labelColor: "#b91c1c",
+                  valueColor: "#b91c1c",
+                  alertBg: "#fef2f2",
+                },
+              },
+              activeFilterValue: filterTtr !== "ALL" ? filterTtr : undefined,
+              rows: globalStats.ttrRows,
+              onRowClick: (label) => {
+                setFilterTtr(filterTtr === label ? "ALL" : label);
+              },
+            })}
           </div>
         </div>
 
-        {/* KARTU 2: INDIKASI GAMAS (TICKET ID) */}
-        {renderExecutiveCard({
-          title: "INDIKASI GAMAS (TICKET ID)",
-          bigValue: globalStats.gamasTotal,
-          bigValueColor: globalStats.gamasTotal > 0 ? "#b91c1c" : "#0f172a",
-          rowHighlightMap: {
-            "Tiket Gamas": {
-              labelColor: "#b91c1c",
-              valueColor: "#b91c1c",
-              alertBg: "#fef2f2",
-            },
-          },
-          activeFilterValue:
-            filterGamas === "GAMAS"
-              ? "Tiket Gamas"
-              : filterGamas === "NON_GAMAS"
-              ? "Non-Gamas"
-              : undefined,
-          rows: globalStats.gamasRows,
-          onRowClick: (label) => {
-            if (label === "Tiket Gamas") {
-              setFilterGamas(filterGamas === "GAMAS" ? "ALL" : "GAMAS");
-            } else {
-              setFilterGamas(filterGamas === "NON_GAMAS" ? "ALL" : "NON_GAMAS");
-            }
-          },
-        })}
-
-        {/* KARTU 3: SEGMEN PELANGGAN */}
-        {renderExecutiveCard({
-          title: "SEGMEN PELANGGAN",
-          bigValue: (
-            <span style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a" }}>
-              HVC: {globalStats.hvcTotal}{" "}
-              <span style={{ color: "#64748b", fontWeight: 600, fontSize: "12px" }}>
-                ({globalStats.hvcSharePct}%)
-              </span>
-              <span style={{ margin: "0 6px", color: "#cbd5e1" }}>|</span>
-              REG: {globalStats.regTotal}{" "}
-              <span style={{ color: "#64748b", fontWeight: 600, fontSize: "12px" }}>
-                ({globalStats.regSharePct}%)
-              </span>
-            </span>
-          ),
-          bigValueFontSize: "14px",
-          activeFilterValue: filterCustType !== "ALL" ? filterCustType : undefined,
-          rows: globalStats.segmenRows,
-          onRowClick: (label) => {
-            setFilterCustType(filterCustType === label ? "ALL" : label);
-          },
-        })}
-
-        {/* KARTU 4: STATUS TIKET */}
-        {renderExecutiveCard({
-          title: "STATUS TIKET",
-          bigValue: globalStats.total,
-          bigValueColor: "#1e3a8a",
-          activeFilterValue: filterStatus !== "ALL" ? filterStatus : undefined,
-          rows: globalStats.statusRows,
-          onRowClick: (label) => {
-            setFilterStatus(filterStatus === label ? "ALL" : label);
-          },
-        })}
-
-        {/* KARTU 5: SERVICE TYPE */}
-        {renderExecutiveCard({
-          title: "SERVICE TYPE",
-          bigValue: globalStats.total,
-          bigValueColor: "#0f172a",
-          rows: globalStats.serviceRows,
-        })}
-
-        {/* KARTU 6: STATUS MANJA */}
-        {renderExecutiveCard({
-          title: "STATUS MANJA",
-          bigValue: globalStats.total,
-          bigValueColor: "#0f172a",
-          rowHighlightMap: {
-            "MANJA EXPIRED": {
-              labelColor: "#b91c1c",
-              valueColor: "#b91c1c",
-              alertBg: "#fef2f2",
-            },
-          },
-          activeFilterValue: filterManja !== "ALL" ? filterManja : undefined,
-          rows: globalStats.manjaRows,
-          onRowClick: (label) => {
-            setFilterManja(filterManja === label ? "ALL" : label);
-          },
-        })}
-
-        {/* KARTU 7: STATUS TTR (SLA COMPLIANCE) */}
-        {renderExecutiveCard({
-          title: "STATUS TTR (SLA COMPLIANCE)",
-          bigValue: (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "18px", fontWeight: 800, color: "#0f172a" }}>
-                {globalStats.inSlaRatePct}%{" "}
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#0d9488" }}>IN SLA</span>
-              </span>
-              {globalStats.ttrExpiredTotal > 0 && (
-                <span
-                  style={{
-                    background: "#fee2e2",
-                    color: "#b91c1c",
-                    border: "1px solid #fecaca",
-                    fontSize: "10px",
-                    fontWeight: 800,
-                    padding: "1px 6px",
-                    borderRadius: "4px",
-                  }}
-                >
-                  {globalStats.ttrExpiredTotal} Expired
-                </span>
-              )}
-            </div>
-          ),
-          bigValueFontSize: "18px",
-          rowHighlightMap: {
-            "SLA Kritis": {
-              labelColor: "#b45309",
-              valueColor: "#b45309",
-              alertBg: "#fffbeb",
-            },
-            "TTR Expired": {
-              labelColor: "#b91c1c",
-              valueColor: "#b91c1c",
-              alertBg: "#fef2f2",
-            },
-          },
-          activeFilterValue: filterTtr !== "ALL" ? filterTtr : undefined,
-          rows: globalStats.ttrRows,
-          onRowClick: (label) => {
-            setFilterTtr(filterTtr === label ? "ALL" : label);
-          },
-        })}
-      </div>
-
-      {/* 2 TABEL REKAP MATRIKS PER WITEL (ATAS: JAKUT, BAWAH: JAKBAR) */}
-      <div className="matrix-tables-grid" style={{ marginBottom: "10px" }}>
-        {renderMatrixCard(
-          "REKAP TIKET WITEL JAKUT (SEGMEN × STATUS MANJA × TTR)",
-          "JAKUT",
-          jakutMatrix
-        )}
-        {renderMatrixCard(
-          "REKAP TIKET WITEL JAKBAR (SEGMEN × STATUS MANJA × TTR)",
-          "JAKBAR",
-          jakbarMatrix
-        )}
+        {/* KOLOM KANAN: TABEL MATRIKS JAKUT (ATAS) & JAKBAR (BAWAH) */}
+        <div className="exec-right-tables-col">
+          {renderMatrixCard(
+            "REKAP TIKET WITEL JAKUT (SEGMEN × STATUS MANJA × TTR)",
+            "JAKUT",
+            jakutMatrix
+          )}
+          {renderMatrixCard(
+            "REKAP TIKET WITEL JAKBAR (SEGMEN × STATUS MANJA × TTR)",
+            "JAKBAR",
+            jakbarMatrix
+          )}
+        </div>
       </div>
 
       {/* TABEL DETAIL 17 KOLOM */}

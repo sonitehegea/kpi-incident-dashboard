@@ -51,9 +51,27 @@ const CARD_SEGMEN_ORDER = [
 
 const CARD_STATUS_ORDER = ["BACKEND", "ANALYSIS", "DRAFT"];
 const CARD_SERVICE_ORDER = ["INTERNET", "VOICE", "IPTV", "UNKNOWN"];
-const CARD_MANJA_ORDER = ["MANJA HI", "MANJA H++", "NON MANJA", "MANJA EXP"];
+const CARD_MANJA_ORDER = [
+  "MANJA HI",
+  "MANJA H+",
+  "MANJA H++",
+  "NON MANJA",
+  "MANJA EXPIRED",
+];
 
-type ManjaCategory = "MANJA HI" | "MANJA H++" | "NON MANJA" | "MANJA EXP";
+type ManjaCategory =
+  | "MANJA HI"
+  | "MANJA H+"
+  | "MANJA H++"
+  | "NON MANJA"
+  | "MANJA EXPIRED";
+
+// Helper menambah N hari ke string tanggal YYYY-MM-DD
+function addDaysToYmd(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return dt.toISOString().slice(0, 10);
+}
 
 // Klasifikasi Status Manja dari kolom BOOKING DATE (WIB)
 function classifyStatusManja(bookingDateRaw?: string): ManjaCategory {
@@ -66,6 +84,7 @@ function classifyStatusManja(bookingDateRaw?: string): ManjaCategory {
   const todayWibStr = now.toLocaleDateString("en-CA", {
     timeZone: "Asia/Jakarta",
   });
+  const tomorrowWibStr = addDaysToYmd(todayWibStr, 1);
 
   let parsedDate: Date | null = null;
   let bookingDateOnlyStr = "";
@@ -107,19 +126,26 @@ function classifyStatusManja(bookingDateRaw?: string): ManjaCategory {
     return "NON MANJA";
   }
 
-  if (bookingDateOnlyStr > todayWibStr) {
-    return "MANJA H++";
-  }
-
+  // Tanggal sebelum hari ini -> MANJA EXPIRED
   if (bookingDateOnlyStr < todayWibStr) {
-    return "MANJA EXP";
+    return "MANJA EXPIRED";
   }
 
-  if (parsedDate.getTime() < now.getTime()) {
-    return "MANJA EXP";
+  // Tanggal sama dengan hari ini -> cek apakah jam sudah terlewat
+  if (bookingDateOnlyStr === todayWibStr) {
+    if (parsedDate.getTime() < now.getTime()) {
+      return "MANJA EXPIRED";
+    }
+    return "MANJA HI";
   }
 
-  return "MANJA HI";
+  // Tanggal tepat besok (H+1) -> MANJA H+
+  if (bookingDateOnlyStr === tomorrowWibStr) {
+    return "MANJA H+";
+  }
+
+  // Tanggal H+2 atau lebih -> MANJA H++
+  return "MANJA H++";
 }
 
 interface PillRowItem {
@@ -1138,7 +1164,7 @@ export default function DashboardPage({
           rows: globalStats.serviceRows,
         })}
 
-        {/* KARTU 6: STATUS MANJA */}
+        {/* KARTU 6: STATUS MANJA (5 KATEGORI: MANJA HI, MANJA H+, MANJA H++, NON MANJA, MANJA EXPIRED) */}
         {renderCompactPillCard({
           title: "STATUS MANJA",
           titlePillBg: "linear-gradient(135deg, #84cc16 0%, #65a30d 100%)",
@@ -1152,6 +1178,40 @@ export default function DashboardPage({
           defaultPillActiveBorder: "#16a34a",
           defaultLabelColor: "#15803d",
           defaultValueColor: "#14532d",
+          rowStyleOverrides: {
+            "MANJA H+": {
+              pillBg: "#ecfeff",
+              pillActiveBg: "#cffafe",
+              pillBorder: "#a5f3fc",
+              pillActiveBorder: "#0891b2",
+              labelColor: "#0e7490",
+              valueColor: "#164e63",
+            },
+            "MANJA H++": {
+              pillBg: "#eff6ff",
+              pillActiveBg: "#dbeafe",
+              pillBorder: "#bfdbfe",
+              pillActiveBorder: "#2563eb",
+              labelColor: "#1d4ed8",
+              valueColor: "#1e3a8a",
+            },
+            "NON MANJA": {
+              pillBg: "#f8fafc",
+              pillActiveBg: "#e2e8f0",
+              pillBorder: "#cbd5e1",
+              pillActiveBorder: "#475569",
+              labelColor: "#334155",
+              valueColor: "#0f172a",
+            },
+            "MANJA EXPIRED": {
+              pillBg: "#fef2f2",
+              pillActiveBg: "#fee2e2",
+              pillBorder: "#fecaca",
+              pillActiveBorder: "#dc2626",
+              labelColor: "#b91c1c",
+              valueColor: "#7f1d1d",
+            },
+          },
           activeFilterValue: filterManja !== "ALL" ? filterManja : undefined,
           rows: globalStats.manjaRows,
           onRowClick: (label) => {
@@ -1320,9 +1380,11 @@ export default function DashboardPage({
                   const manjaBadgeStyle: React.CSSProperties =
                     manjaLabel === "MANJA HI"
                       ? { background: "#dcfce7", color: "#15803d" }
+                      : manjaLabel === "MANJA H+"
+                      ? { background: "#cffafe", color: "#0e7490" }
                       : manjaLabel === "MANJA H++"
                       ? { background: "#dbeafe", color: "#1d4ed8" }
-                      : manjaLabel === "MANJA EXP"
+                      : manjaLabel === "MANJA EXPIRED"
                       ? { background: "#fee2e2", color: "#b91c1c" }
                       : { background: "#f1f5f9", color: "#475569" };
 

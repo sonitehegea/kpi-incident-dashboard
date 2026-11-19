@@ -284,6 +284,8 @@ export default function DashboardPage({
     let gamasTotal = 0;
     let hvcTotal = 0;
     let regTotal = 0;
+    let inSlaTotal = 0;
+    let slaKritisTotal = 0;
     let ttrExpiredTotal = 0;
 
     const gamasMap: Record<string, { jakbar: number; jakut: number }> = {
@@ -352,6 +354,9 @@ export default function DashboardPage({
 
       const ttrEval = evaluateTtr(row.reported_date, row.customer_type);
       if (ttrEval.status === "TTR Expired") ttrExpiredTotal++;
+      else if (ttrEval.status === "SLA Kritis") slaKritisTotal++;
+      else inSlaTotal++;
+
       if (isJakbar) ttrMap[ttrEval.status].jakbar++;
       if (isJakut) ttrMap[ttrEval.status].jakut++;
     });
@@ -372,14 +377,28 @@ export default function DashboardPage({
       });
     };
 
+    const jakbarSharePct = total > 0 ? Math.round((jakbarCount / total) * 100) : 0;
+    const jakutSharePct = total > 0 ? Math.round((jakutCount / total) * 100) : 0;
+    const hvcSharePct = total > 0 ? Math.round((hvcTotal / total) * 100) : 0;
+    const regSharePct = total > 0 ? Math.round((regTotal / total) * 100) : 0;
+    const inSlaRatePct =
+      total > 0 ? (((total - ttrExpiredTotal) / total) * 100).toFixed(1) : "100.0";
+
     return {
       total,
       jakutCount,
       jakbarCount,
+      jakbarSharePct,
+      jakutSharePct,
       gamasTotal,
       hvcTotal,
       regTotal,
+      hvcSharePct,
+      regSharePct,
+      inSlaTotal,
+      slaKritisTotal,
       ttrExpiredTotal,
+      inSlaRatePct,
       gamasRows: toRows(gamasMap, ["Tiket Gamas", "Non-Gamas"]),
       segmenRows: toRows(segMap, CARD_SEGMEN_ORDER),
       statusRows: toRows(statusMap, CARD_STATUS_ORDER),
@@ -628,7 +647,7 @@ export default function DashboardPage({
     document.body.removeChild(link);
   };
 
-  // Donut Chart SVG Calculation
+  // Donut Chart SVG Calculation (Executive Emerald & Navy)
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
   const jakutPct = globalStats.total ? globalStats.jakutCount / globalStats.total : 0;
@@ -636,54 +655,32 @@ export default function DashboardPage({
   const jakutStroke = jakutPct * circumference;
   const jakbarStroke = jakbarPct * circumference;
 
-  const renderCompactPillCard = (params: {
+  // Kartu KPI Executive Formal (Seragam Slate Navy + Micro-Table Hairline)
+  const renderExecutiveCard = (params: {
     title: string;
-    titlePillBg: string;
-    titlePillColor?: string;
-    colHeaderPillBg: string;
-    colHeaderTextColor: string;
-    bigValue: string | number;
-    bigValueColor: string;
+    bigValue: React.ReactNode;
+    bigValueColor?: string;
     bigValueFontSize?: string;
-    defaultPillBg: string;
-    defaultPillActiveBg: string;
-    defaultPillBorder: string;
-    defaultPillActiveBorder: string;
-    defaultLabelColor: string;
-    defaultValueColor: string;
     activeFilterValue?: string;
     rows: PillRowItem[];
-    rowStyleOverrides?: Record<
+    rowHighlightMap?: Record<
       string,
       {
-        pillBg: string;
-        pillActiveBg: string;
-        pillBorder: string;
-        pillActiveBorder: string;
         labelColor: string;
         valueColor: string;
+        alertBg?: string;
       }
     >;
     onRowClick?: (label: string) => void;
   }) => {
     const {
       title,
-      titlePillBg,
-      titlePillColor = "#ffffff",
-      colHeaderPillBg,
-      colHeaderTextColor,
       bigValue,
-      bigValueColor,
-      bigValueFontSize = "21px",
-      defaultPillBg,
-      defaultPillActiveBg,
-      defaultPillBorder,
-      defaultPillActiveBorder,
-      defaultLabelColor,
-      defaultValueColor,
+      bigValueColor = "#0f172a",
+      bigValueFontSize = "20px",
       activeFilterValue,
       rows,
-      rowStyleOverrides,
+      rowHighlightMap,
       onRowClick,
     } = params;
 
@@ -693,167 +690,172 @@ export default function DashboardPage({
         style={{
           background: "#ffffff",
           borderRadius: "8px",
-          border: "1px solid #e2e8f0",
-          padding: "6px 8px",
+          border: "1px solid #cbd5e1",
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
           boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
         }}
       >
+        {/* Header Kartu Seragam Slate Navy */}
         <div
           style={{
-            background: titlePillBg,
-            borderRadius: "99px",
-            padding: "3.5px 10px",
+            background: "#1e293b",
+            padding: "4.5px 10px",
             textAlign: "center",
-            fontWeight: 800,
-            fontSize: "10px",
-            color: titlePillColor,
-            letterSpacing: "0.35px",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            fontWeight: 700,
+            fontSize: "9.5px",
+            color: "#f8fafc",
+            letterSpacing: "0.5px",
+            textTransform: "uppercase",
           }}
         >
           {title}
         </div>
 
+        {/* Angka Utama / Executive Summary Metric */}
         <div
           style={{
-            padding: "4px 4px 3px 4px",
+            padding: "6px 8px 4px 8px",
             textAlign: "center",
             fontSize: bigValueFontSize,
             fontWeight: 800,
             color: bigValueColor,
-            lineHeight: 1.05,
+            lineHeight: 1.15,
             letterSpacing: "-0.3px",
           }}
         >
           {bigValue}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "2.5px" }}>
+        {/* Tabel Mikro dengan Garis Pembatas Halus (Hairline Divider) */}
+        <div style={{ padding: "0 8px 6px 8px" }}>
           <div
             style={{
-              background: colHeaderPillBg,
-              borderRadius: "99px",
-              padding: "2px 8px",
               display: "grid",
               gridTemplateColumns: "1fr 34px 34px 36px",
               alignItems: "center",
-              fontSize: "9.5px",
-              fontWeight: 800,
-              color: colHeaderTextColor,
+              padding: "2px 4px 3px 4px",
+              borderBottom: "1px solid #cbd5e1",
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "#64748b",
+              textTransform: "uppercase",
+              letterSpacing: "0.2px",
             }}
           >
             <span />
-            <span style={{ textAlign: "center" }}>Jakbar</span>
-            <span style={{ textAlign: "center" }}>Jakut</span>
-            <span style={{ textAlign: "center" }}>Total</span>
+            <span style={{ textAlign: "right" }}>Jakbar</span>
+            <span style={{ textAlign: "right" }}>Jakut</span>
+            <span style={{ textAlign: "right", color: "#0f172a" }}>Total</span>
           </div>
 
-          {rows.map((r) => {
-            const isSelected = activeFilterValue === r.label;
-            const styleCfg = rowStyleOverrides?.[r.label] || {
-              pillBg: defaultPillBg,
-              pillActiveBg: defaultPillActiveBg,
-              pillBorder: defaultPillBorder,
-              pillActiveBorder: defaultPillActiveBorder,
-              labelColor: defaultLabelColor,
-              valueColor: defaultValueColor,
-            };
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {rows.map((r, idx) => {
+              const isSelected = activeFilterValue === r.label;
+              const isLast = idx === rows.length - 1;
+              const customStyle = rowHighlightMap?.[r.label];
+              const hasAlertBg = customStyle?.alertBg && r.total > 0;
 
-            return (
-              <div
-                key={r.label}
-                className="stat-pill"
-                onClick={() => onRowClick && onRowClick(r.label)}
-                style={{
-                  background: isSelected ? styleCfg.pillActiveBg : styleCfg.pillBg,
-                  border: isSelected
-                    ? `1.5px solid ${styleCfg.pillActiveBorder}`
-                    : `1px solid ${styleCfg.pillBorder}`,
-                  borderRadius: "99px",
-                  padding: "2.5px 8px",
-                  display: "grid",
-                  gridTemplateColumns: "1fr 34px 34px 36px",
-                  alignItems: "center",
-                  fontSize: "10.5px",
-                  cursor: onRowClick ? "pointer" : "default",
-                }}
-                title={onRowClick ? `Klik untuk filter ${r.label}` : undefined}
-              >
-                <span
+              return (
+                <div
+                  key={r.label}
+                  className="exec-metric-row"
+                  onClick={() => onRowClick && onRowClick(r.label)}
                   style={{
-                    color: styleCfg.labelColor,
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 34px 34px 36px",
+                    alignItems: "center",
+                    padding: "3px 4px",
+                    borderBottom: isLast ? "none" : "1px solid #f1f5f9",
+                    background: isSelected
+                      ? "#eff6ff"
+                      : hasAlertBg
+                      ? customStyle.alertBg
+                      : "transparent",
+                    borderRadius: isSelected || hasAlertBg ? "4px" : "0",
+                    fontSize: "10.5px",
+                    cursor: onRowClick ? "pointer" : "default",
                   }}
+                  title={onRowClick ? `Klik untuk filter ${r.label}` : undefined}
                 >
-                  {r.label}
-                </span>
+                  <span
+                    style={{
+                      color: isSelected
+                        ? "#1d4ed8"
+                        : customStyle && r.total > 0
+                        ? customStyle.labelColor
+                        : "#334155",
+                      fontWeight: isSelected || (customStyle && r.total > 0) ? 700 : 600,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {r.label}
+                  </span>
 
-                <span
-                  style={{
-                    textAlign: "center",
-                    fontWeight: r.jakbar > 0 ? 700 : 600,
-                    color: r.jakbar === 0 ? "#16a34a" : styleCfg.valueColor,
-                  }}
-                >
-                  {r.jakbar}
-                </span>
+                  <span
+                    style={{
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                      fontWeight: r.jakbar > 0 ? 600 : 400,
+                      color: r.jakbar === 0 ? "#cbd5e1" : "#334155",
+                    }}
+                  >
+                    {r.jakbar}
+                  </span>
 
-                <span
-                  style={{
-                    textAlign: "center",
-                    fontWeight: r.jakut > 0 ? 700 : 600,
-                    color: r.jakut === 0 ? "#16a34a" : styleCfg.valueColor,
-                  }}
-                >
-                  {r.jakut}
-                </span>
+                  <span
+                    style={{
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                      fontWeight: r.jakut > 0 ? 600 : 400,
+                      color: r.jakut === 0 ? "#cbd5e1" : "#334155",
+                    }}
+                  >
+                    {r.jakut}
+                  </span>
 
-                <span
-                  style={{
-                    textAlign: "center",
-                    fontWeight: 800,
-                    color: r.total === 0 ? "#16a34a" : styleCfg.valueColor,
-                  }}
-                >
-                  {r.total}
-                </span>
-              </div>
-            );
-          })}
+                  <span
+                    style={{
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                      fontWeight: r.total > 0 ? 700 : 400,
+                      color:
+                        r.total === 0
+                          ? "#cbd5e1"
+                          : customStyle
+                          ? customStyle.valueColor
+                          : "#0f172a",
+                    }}
+                  >
+                    {r.total}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
   };
 
-  // Component Tabel Matriks Padat: SEGMEN | STATUS MANJA | TTR
+  // Component Tabel Matriks Executive Formal: SEGMEN | STATUS MANJA | TTR
   const renderMatrixCard = (
     title: string,
     witelCode: string,
     matrix: ReturnType<typeof buildWitelMatrix>
   ) => {
-    const gapThStyle: React.CSSProperties = {
-      width: "10px",
-      minWidth: "10px",
-      background: "#ffffff",
-      borderBottom: "none",
-      padding: 0,
+    const groupDividerLeft: React.CSSProperties = {
+      borderLeft: "2px solid #cbd5e1",
     };
 
-    const gapTdStyle: React.CSSProperties = {
-      width: "10px",
-      minWidth: "10px",
-      background: "#ffffff",
-      borderBottom: "none",
-      padding: 0,
-    };
+    const formatMatrixZero = (val: number, activeColor: string, bold = false) => ({
+      color: val === 0 ? "#cbd5e1" : activeColor,
+      fontWeight: val === 0 ? 400 : bold ? 800 : 600,
+    });
 
     return (
       <div
@@ -867,9 +869,10 @@ export default function DashboardPage({
           flexDirection: "column",
         }}
       >
+        {/* Header Biru Korporat Formal */}
         <div
           style={{
-            background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+            background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)",
             padding: "6px 12px",
             display: "flex",
             justifyContent: "space-between",
@@ -880,16 +883,17 @@ export default function DashboardPage({
           <span
             style={{
               fontWeight: 700,
-              fontSize: "12px",
+              fontSize: "11.5px",
               color: "#ffffff",
-              letterSpacing: "0.2px",
+              letterSpacing: "0.3px",
             }}
           >
             {title}
           </span>
           <span
             style={{
-              background: "rgba(255,255,255,0.2)",
+              background: "rgba(255,255,255,0.16)",
+              border: "1px solid rgba(255,255,255,0.28)",
               padding: "1.5px 9px",
               borderRadius: "99px",
               fontSize: "10.5px",
@@ -909,11 +913,11 @@ export default function DashboardPage({
                 <th
                   rowSpan={2}
                   style={{
-                    padding: "5px 8px",
-                    fontSize: "10.5px",
+                    padding: "4px 6px",
+                    fontSize: "10px",
                     fontWeight: 700,
                     color: "#475569",
-                    width: "36px",
+                    width: "34px",
                     textAlign: "center",
                     borderBottom: "2px solid #cbd5e1",
                   }}
@@ -923,11 +927,11 @@ export default function DashboardPage({
                 <th
                   rowSpan={2}
                   style={{
-                    padding: "5px 8px",
-                    fontSize: "10.5px",
+                    padding: "4px 8px",
+                    fontSize: "10px",
                     fontWeight: 700,
                     color: "#475569",
-                    minWidth: "84px",
+                    width: "92px",
                     borderBottom: "2px solid #cbd5e1",
                   }}
                 >
@@ -936,66 +940,66 @@ export default function DashboardPage({
                 <th
                   colSpan={matrixSegments.length + 1}
                   style={{
-                    padding: "4px 6px",
-                    fontSize: "10.5px",
+                    padding: "3.5px 4px",
+                    fontSize: "10px",
                     fontWeight: 800,
-                    color: "#334155",
+                    color: "#1e293b",
                     textAlign: "center",
                     borderBottom: "1px solid #cbd5e1",
-                    letterSpacing: "0.3px",
+                    letterSpacing: "0.4px",
+                    ...groupDividerLeft,
                   }}
                 >
                   SEGMEN
                 </th>
 
-                <th rowSpan={2} style={gapThStyle} />
-
                 <th
                   colSpan={2}
                   style={{
-                    padding: "4px 6px",
-                    fontSize: "10.5px",
+                    padding: "3.5px 4px",
+                    fontSize: "10px",
                     fontWeight: 800,
-                    color: "#334155",
+                    color: "#1e293b",
                     textAlign: "center",
                     borderBottom: "1px solid #cbd5e1",
-                    letterSpacing: "0.3px",
+                    letterSpacing: "0.4px",
+                    ...groupDividerLeft,
                   }}
                 >
                   STATUS MANJA
                 </th>
 
-                <th rowSpan={2} style={gapThStyle} />
-
                 <th
                   colSpan={3}
                   style={{
-                    padding: "4px 6px",
-                    fontSize: "10.5px",
+                    padding: "3.5px 4px",
+                    fontSize: "10px",
                     fontWeight: 800,
-                    color: "#334155",
+                    color: "#1e293b",
                     textAlign: "center",
                     borderBottom: "1px solid #cbd5e1",
-                    letterSpacing: "0.3px",
+                    letterSpacing: "0.4px",
+                    ...groupDividerLeft,
                   }}
                 >
-                  TTR
+                  TTR (SLA)
                 </th>
               </tr>
 
               <tr style={{ background: "#f8fafc" }}>
-                {matrixSegments.map((seg) => (
+                {matrixSegments.map((seg, sIdx) => (
                   <th
                     key={seg}
                     title={seg}
                     style={{
-                      padding: "4px 6px",
-                      fontSize: "10.5px",
+                      padding: "3.5px 4px",
+                      fontSize: "10px",
                       fontWeight: 700,
                       color: "#475569",
                       textAlign: "center",
                       whiteSpace: "nowrap",
                       borderBottom: "2px solid #cbd5e1",
+                      ...(sIdx === 0 ? groupDividerLeft : {}),
                     }}
                   >
                     {formatSegmentHeader(seg)}
@@ -1003,12 +1007,13 @@ export default function DashboardPage({
                 ))}
                 <th
                   style={{
-                    padding: "4px 10px",
-                    fontSize: "10.5px",
+                    padding: "3.5px 6px",
+                    fontSize: "10px",
                     fontWeight: 800,
-                    color: "#1d4ed8",
+                    color: "#1e3a8a",
                     textAlign: "center",
-                    width: "64px",
+                    width: "54px",
+                    background: "#eff6ff",
                     borderBottom: "2px solid #cbd5e1",
                   }}
                 >
@@ -1017,23 +1022,24 @@ export default function DashboardPage({
 
                 <th
                   style={{
-                    padding: "4px 10px",
-                    fontSize: "10.5px",
+                    padding: "3.5px 6px",
+                    fontSize: "10px",
                     fontWeight: 700,
                     color: "#475569",
                     textAlign: "center",
                     whiteSpace: "nowrap",
                     borderBottom: "2px solid #cbd5e1",
+                    ...groupDividerLeft,
                   }}
                 >
                   MANJA
                 </th>
                 <th
                   style={{
-                    padding: "4px 10px",
-                    fontSize: "10.5px",
-                    fontWeight: 800,
-                    color: "#1d4ed8",
+                    padding: "3.5px 6px",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: "#475569",
                     textAlign: "center",
                     whiteSpace: "nowrap",
                     borderBottom: "2px solid #cbd5e1",
@@ -1044,23 +1050,24 @@ export default function DashboardPage({
 
                 <th
                   style={{
-                    padding: "4px 8px",
-                    fontSize: "10.5px",
+                    padding: "3.5px 6px",
+                    fontSize: "10px",
                     fontWeight: 700,
                     color: "#475569",
                     textAlign: "center",
                     whiteSpace: "nowrap",
                     borderBottom: "2px solid #cbd5e1",
+                    ...groupDividerLeft,
                   }}
                 >
                   IN SLA
                 </th>
                 <th
                   style={{
-                    padding: "4px 8px",
-                    fontSize: "10.5px",
+                    padding: "3.5px 6px",
+                    fontSize: "10px",
                     fontWeight: 700,
-                    color: "#475569",
+                    color: "#b45309",
                     textAlign: "center",
                     whiteSpace: "nowrap",
                     borderBottom: "2px solid #cbd5e1",
@@ -1070,10 +1077,10 @@ export default function DashboardPage({
                 </th>
                 <th
                   style={{
-                    padding: "4px 8px",
-                    fontSize: "10.5px",
+                    padding: "3.5px 6px",
+                    fontSize: "10px",
                     fontWeight: 800,
-                    color: "#dc2626",
+                    color: "#b91c1c",
                     textAlign: "center",
                     whiteSpace: "nowrap",
                     borderBottom: "2px solid #cbd5e1",
@@ -1088,7 +1095,7 @@ export default function DashboardPage({
               {matrix.workzones.map((row, idx) => {
                 const isSelected =
                   filterWorkzone === row.workzone && filterWitel === witelCode;
-                const isZeroRow = row.rowTotal === 0;
+                const isEven = idx % 2 === 1;
 
                 const applyCellFilter = (
                   e: React.MouseEvent,
@@ -1125,16 +1132,20 @@ export default function DashboardPage({
                       }
                     }}
                     style={{
-                      background: isSelected ? "#eff6ff" : "#ffffff",
+                      background: isSelected
+                        ? "#dbeafe"
+                        : isEven
+                        ? "#f8fafc"
+                        : "#ffffff",
                       cursor: "pointer",
                     }}
                     title="Klik baris untuk memfilter tabel detail berdasarkan Workzone ini"
                   >
                     <td
                       style={{
-                        padding: "3.5px 8px",
-                        fontSize: "11.5px",
-                        fontWeight: 600,
+                        padding: "3.5px 6px",
+                        fontSize: "11px",
+                        fontWeight: 500,
                         color: "#64748b",
                         textAlign: "center",
                         borderBottom: "1px solid #e2e8f0",
@@ -1154,18 +1165,20 @@ export default function DashboardPage({
                       {row.workzone}
                     </td>
 
-                    {matrixSegments.map((seg) => {
+                    {matrixSegments.map((seg, sIdx) => {
                       const val = row.segCounts[seg] || 0;
+                      const isHighGold = seg === "HVC_GOLD" && val >= 8;
                       return (
                         <td
                           key={seg}
                           style={{
-                            padding: "3.5px 6px",
+                            padding: "3.5px 4px",
                             fontSize: "11.5px",
                             textAlign: "center",
-                            fontWeight: 700,
-                            color: val === 0 ? "#16a34a" : "#1e293b",
+                            fontVariantNumeric: "tabular-nums",
                             borderBottom: "1px solid #e2e8f0",
+                            ...formatMatrixZero(val, "#1e293b", isHighGold),
+                            ...(sIdx === 0 ? groupDividerLeft : {}),
                           }}
                         >
                           {val}
@@ -1175,51 +1188,47 @@ export default function DashboardPage({
 
                     <td
                       style={{
-                        padding: "3.5px 10px",
+                        padding: "3.5px 6px",
                         textAlign: "center",
+                        background: isSelected ? "#bfdbfe" : "#f8fafc",
                         borderBottom: "1px solid #e2e8f0",
                       }}
                     >
                       <span
                         style={{
                           background: isSelected
-                            ? "#2563eb"
-                            : isZeroRow
-                            ? "#dcfce7"
-                            : "#dbeafe",
-                          border: isSelected
-                            ? "1px solid #1d4ed8"
-                            : isZeroRow
-                            ? "1px solid #86efac"
-                            : "1px solid #93c5fd",
+                            ? "#1d4ed8"
+                            : row.rowTotal > 0
+                            ? "#dbeafe"
+                            : "transparent",
                           color: isSelected
                             ? "#ffffff"
-                            : isZeroRow
-                            ? "#15803d"
-                            : "#1d4ed8",
-                          fontWeight: 800,
+                            : row.rowTotal > 0
+                            ? "#1e3a8a"
+                            : "#cbd5e1",
+                          fontWeight: row.rowTotal > 0 ? 800 : 400,
                           fontSize: "11px",
-                          padding: "1px 9px",
-                          borderRadius: "99px",
+                          padding: "1px 8px",
+                          borderRadius: "4px",
                           display: "inline-block",
-                          minWidth: "26px",
+                          minWidth: "24px",
+                          fontVariantNumeric: "tabular-nums",
                         }}
                       >
                         {row.rowTotal}
                       </span>
                     </td>
 
-                    <td style={gapTdStyle} />
-
                     <td
                       onClick={(e) => applyCellFilter(e, { manja: "ANY_MANJA" })}
                       style={{
-                        padding: "3.5px 10px",
+                        padding: "3.5px 6px",
                         fontSize: "11.5px",
                         textAlign: "center",
-                        fontWeight: 700,
-                        color: row.manja === 0 ? "#16a34a" : "#1e293b",
+                        fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
+                        ...formatMatrixZero(row.manja, "#0f172a", true),
+                        ...groupDividerLeft,
                       }}
                       title={`Filter ${row.workzone} - MANJA`}
                     >
@@ -1229,29 +1238,28 @@ export default function DashboardPage({
                     <td
                       onClick={(e) => applyCellFilter(e, { manja: "NON MANJA" })}
                       style={{
-                        padding: "3.5px 10px",
+                        padding: "3.5px 6px",
                         fontSize: "11.5px",
                         textAlign: "center",
-                        fontWeight: 800,
-                        color: row.nonManja === 0 ? "#16a34a" : "#1d4ed8",
+                        fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
+                        ...formatMatrixZero(row.nonManja, "#334155", false),
                       }}
                       title={`Filter ${row.workzone} - NON MANJA`}
                     >
                       {row.nonManja}
                     </td>
 
-                    <td style={gapTdStyle} />
-
                     <td
                       onClick={(e) => applyCellFilter(e, { ttr: "IN SLA" })}
                       style={{
-                        padding: "3.5px 8px",
+                        padding: "3.5px 6px",
                         fontSize: "11.5px",
                         textAlign: "center",
-                        fontWeight: 700,
-                        color: row.inSla === 0 ? "#16a34a" : "#1e293b",
+                        fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
+                        ...formatMatrixZero(row.inSla, "#0f172a", false),
+                        ...groupDividerLeft,
                       }}
                       title={`Filter ${row.workzone} - IN SLA`}
                     >
@@ -1261,12 +1269,13 @@ export default function DashboardPage({
                     <td
                       onClick={(e) => applyCellFilter(e, { ttr: "SLA Kritis" })}
                       style={{
-                        padding: "3.5px 8px",
+                        padding: "3.5px 6px",
                         fontSize: "11.5px",
                         textAlign: "center",
-                        fontWeight: 800,
-                        color: row.slaKritis === 0 ? "#16a34a" : "#d97706",
+                        fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
+                        background: row.slaKritis > 0 ? "#fef3c7" : undefined,
+                        ...formatMatrixZero(row.slaKritis, "#b45309", true),
                       }}
                       title={`Filter ${row.workzone} - SLA Kritis`}
                     >
@@ -1276,12 +1285,13 @@ export default function DashboardPage({
                     <td
                       onClick={(e) => applyCellFilter(e, { ttr: "TTR Expired" })}
                       style={{
-                        padding: "3.5px 8px",
+                        padding: "3.5px 6px",
                         fontSize: "11.5px",
                         textAlign: "center",
-                        fontWeight: 800,
-                        color: row.ttrExpired === 0 ? "#16a34a" : "#dc2626",
+                        fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
+                        background: row.ttrExpired > 0 ? "#fee2e2" : undefined,
+                        ...formatMatrixZero(row.ttrExpired, "#b91c1c", true),
                       }}
                       title={`Filter ${row.workzone} - TTR Expired`}
                     >
@@ -1292,32 +1302,34 @@ export default function DashboardPage({
               })}
 
               {/* BARIS GRAND TOTAL */}
-              <tr style={{ background: "#f1f5f9" }}>
+              <tr style={{ background: "#e2e8f0" }}>
                 <td
                   colSpan={2}
                   style={{
                     padding: "5px 8px",
-                    fontSize: "11.5px",
+                    fontSize: "11px",
                     fontWeight: 800,
                     color: "#0f172a",
-                    borderTop: "2px solid #cbd5e1",
+                    borderTop: "2px solid #94a3b8",
+                    letterSpacing: "0.2px",
                   }}
                 >
                   GRAND TOTAL {witelCode}
                 </td>
 
-                {matrixSegments.map((seg) => {
+                {matrixSegments.map((seg, sIdx) => {
                   const colTotal = matrix.segColTotals[seg] || 0;
                   return (
                     <td
                       key={seg}
                       style={{
-                        padding: "5px 6px",
+                        padding: "5px 4px",
                         fontSize: "11.5px",
-                        fontWeight: 800,
-                        color: colTotal === 0 ? "#16a34a" : "#0f172a",
                         textAlign: "center",
-                        borderTop: "2px solid #cbd5e1",
+                        fontVariantNumeric: "tabular-nums",
+                        borderTop: "2px solid #94a3b8",
+                        ...formatMatrixZero(colTotal, "#0f172a", true),
+                        ...(sIdx === 0 ? groupDividerLeft : {}),
                       }}
                     >
                       {colTotal}
@@ -1327,89 +1339,89 @@ export default function DashboardPage({
 
                 <td
                   style={{
-                    padding: "5px 10px",
+                    padding: "5px 6px",
                     textAlign: "center",
-                    borderTop: "2px solid #cbd5e1",
+                    borderTop: "2px solid #94a3b8",
                   }}
                 >
                   <span
                     style={{
-                      background: "#dcfce7",
-                      border: "1px solid #86efac",
-                      color: "#15803d",
+                      background: "#1e3a8a",
+                      color: "#ffffff",
                       fontWeight: 800,
-                      fontSize: "11.5px",
-                      padding: "1px 10px",
-                      borderRadius: "99px",
+                      fontSize: "11px",
+                      padding: "1.5px 9px",
+                      borderRadius: "4px",
                       display: "inline-block",
-                      minWidth: "28px",
+                      minWidth: "26px",
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {matrix.totalTickets}
                   </span>
                 </td>
 
-                <td style={gapTdStyle} />
-
                 <td
                   style={{
-                    padding: "5px 10px",
+                    padding: "5px 6px",
                     fontSize: "11.5px",
-                    fontWeight: 800,
-                    color: matrix.totalManja === 0 ? "#16a34a" : "#0f172a",
                     textAlign: "center",
-                    borderTop: "2px solid #cbd5e1",
+                    fontVariantNumeric: "tabular-nums",
+                    borderTop: "2px solid #94a3b8",
+                    ...formatMatrixZero(matrix.totalManja, "#0f172a", true),
+                    ...groupDividerLeft,
                   }}
                 >
                   {matrix.totalManja}
                 </td>
                 <td
                   style={{
-                    padding: "5px 10px",
+                    padding: "5px 6px",
                     fontSize: "11.5px",
-                    fontWeight: 800,
-                    color: "#15803d",
                     textAlign: "center",
-                    borderTop: "2px solid #cbd5e1",
+                    fontVariantNumeric: "tabular-nums",
+                    borderTop: "2px solid #94a3b8",
+                    ...formatMatrixZero(matrix.totalNonManja, "#0f172a", true),
                   }}
                 >
                   {matrix.totalNonManja}
                 </td>
 
-                <td style={gapTdStyle} />
-
                 <td
                   style={{
-                    padding: "5px 8px",
+                    padding: "5px 6px",
                     fontSize: "11.5px",
-                    fontWeight: 800,
-                    color: matrix.totalInSla === 0 ? "#16a34a" : "#0f172a",
                     textAlign: "center",
-                    borderTop: "2px solid #cbd5e1",
+                    fontVariantNumeric: "tabular-nums",
+                    borderTop: "2px solid #94a3b8",
+                    ...formatMatrixZero(matrix.totalInSla, "#0f172a", true),
+                    ...groupDividerLeft,
                   }}
                 >
                   {matrix.totalInSla}
                 </td>
                 <td
                   style={{
-                    padding: "5px 8px",
+                    padding: "5px 6px",
                     fontSize: "11.5px",
-                    fontWeight: 800,
-                    color: matrix.totalSlaKritis === 0 ? "#16a34a" : "#d97706",
                     textAlign: "center",
-                    borderTop: "2px solid #cbd5e1",
+                    fontVariantNumeric: "tabular-nums",
+                    borderTop: "2px solid #94a3b8",
+                    background: matrix.totalSlaKritis > 0 ? "#fef3c7" : undefined,
+                    ...formatMatrixZero(matrix.totalSlaKritis, "#b45309", true),
                   }}
                 >
                   {matrix.totalSlaKritis}
                 </td>
                 <td
                   style={{
-                    padding: "5px 8px",
+                    padding: "5px 6px",
                     fontSize: "11.5px",
-                    fontWeight: 800,
-                    color: matrix.totalTtrExpired === 0 ? "#16a34a" : "#dc2626",
                     textAlign: "center",
-                    borderTop: "2px solid #cbd5e1",
+                    fontVariantNumeric: "tabular-nums",
+                    borderTop: "2px solid #94a3b8",
+                    background: matrix.totalTtrExpired > 0 ? "#fee2e2" : undefined,
+                    ...formatMatrixZero(matrix.totalTtrExpired, "#b91c1c", true),
                   }}
                 >
                   {matrix.totalTtrExpired}
@@ -1440,14 +1452,14 @@ export default function DashboardPage({
   };
 
   return (
-    <div style={{ width: "100%", maxWidth: "1720px", margin: "0 auto", padding: "8px 12px" }}>
-      {/* HEADER BAR DIPERTAHANKAN SESUAI POSISI SEMULA */}
+    <div style={{ width: "100%", maxWidth: "1180px", margin: "0 auto", padding: "8px 12px" }}>
+      {/* HEADER BAR EXECUTIVE FORMAL */}
       <div
         style={{
           background: "#ffffff",
-          border: "1px solid #e2e8f0",
-          borderRadius: "10px",
-          padding: "10px 16px",
+          border: "1px solid #cbd5e1",
+          borderRadius: "8px",
+          padding: "9px 16px",
           marginBottom: "8px",
           display: "flex",
           justifyContent: "space-between",
@@ -1458,26 +1470,26 @@ export default function DashboardPage({
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>
+          <h1 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>
             Monitoring Gangguan Branch Northern Jakarta – {todayTitle}
           </h1>
-          <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
+          <div style={{ fontSize: "11.5px", color: "#64748b", marginTop: "2px" }}>
             Last Sync: <strong style={{ color: "#334155" }}>{lastSyncWib}</strong> • Total Sumber Data:{" "}
-            <strong style={{ color: "#2563eb" }}>{incidents.length} Tiket</strong>
+            <strong style={{ color: "#1e3a8a" }}>{incidents.length} Tiket</strong>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
           <button
             type="button"
             onClick={handleExportCsv}
             style={{
-              background: "#16a34a",
-              color: "#fff",
-              border: "none",
-              padding: "6px 13px",
-              borderRadius: "99px",
-              fontSize: "12px",
+              background: "#f8fafc",
+              color: "#334155",
+              border: "1px solid #cbd5e1",
+              padding: "5px 12px",
+              borderRadius: "6px",
+              fontSize: "11.5px",
               fontWeight: 600,
               cursor: "pointer",
             }}
@@ -1489,12 +1501,12 @@ export default function DashboardPage({
             onClick={onRefresh}
             disabled={loading}
             style={{
-              background: "#2563eb",
+              background: "#1e3a8a",
               color: "#fff",
-              border: "none",
-              padding: "6px 15px",
-              borderRadius: "99px",
-              fontSize: "12px",
+              border: "1px solid #1e3a8a",
+              padding: "5px 14px",
+              borderRadius: "6px",
+              fontSize: "11.5px",
               fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
             }}
@@ -1504,7 +1516,7 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* GRID BENTO ULTRA-RAPAT */}
+      {/* GRID BENTO EXECUTIVE */}
       <div className="kpi-bento-grid" style={{ marginBottom: "8px" }}>
         {/* KARTU 1 (SPAN 2 BARIS): TOTAL TIKET AKTIF + DONUT CHART */}
         <div
@@ -1512,8 +1524,8 @@ export default function DashboardPage({
           style={{
             background: "#ffffff",
             borderRadius: "8px",
-            border: "1px solid #e2e8f0",
-            padding: "7px 9px",
+            border: "1px solid #cbd5e1",
+            overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
@@ -1522,22 +1534,21 @@ export default function DashboardPage({
         >
           <div
             style={{
-              background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
-              borderRadius: "99px",
-              padding: "4px 10px",
+              background: "#1e293b",
+              padding: "4.5px 10px",
               textAlign: "center",
-              fontWeight: 800,
-              fontSize: "10px",
-              color: "#ffffff",
-              letterSpacing: "0.4px",
+              fontWeight: 700,
+              fontSize: "9.5px",
+              color: "#f8fafc",
+              letterSpacing: "0.5px",
             }}
           >
             TOTAL TIKET AKTIF
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", margin: "4px 0" }}>
-            <svg width="108" height="108" viewBox="0 0 88 88" style={{ filter: "drop-shadow(0 3px 8px rgba(37,99,235,0.12))" }}>
-              <circle cx="44" cy="44" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="9.5" />
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", margin: "6px 0" }}>
+            <svg width="112" height="112" viewBox="0 0 88 88">
+              <circle cx="44" cy="44" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="9" />
               {globalStats.total > 0 && (
                 <>
                   <circle
@@ -1545,8 +1556,8 @@ export default function DashboardPage({
                     cy="44"
                     r={radius}
                     fill="transparent"
-                    stroke="#16a34a"
-                    strokeWidth="9.5"
+                    stroke="#0d9488"
+                    strokeWidth="9"
                     strokeDasharray={`${jakutStroke} ${circumference}`}
                     transform="rotate(-90 44 44)"
                   />
@@ -1555,8 +1566,8 @@ export default function DashboardPage({
                     cy="44"
                     r={radius}
                     fill="transparent"
-                    stroke="#2563eb"
-                    strokeWidth="9.5"
+                    stroke="#1e3a8a"
+                    strokeWidth="9"
                     strokeDasharray={`${jakbarStroke} ${circumference}`}
                     strokeDashoffset={-jakutStroke}
                     transform="rotate(-90 44 44)"
@@ -1566,74 +1577,77 @@ export default function DashboardPage({
               <text x="44" y="42" textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="800">
                 {globalStats.total}
               </text>
-              <text x="44" y="54" textAnchor="middle" fill="#64748b" fontSize="7" fontWeight="700">
+              <text x="44" y="54" textAnchor="middle" fill="#64748b" fontSize="6.8" fontWeight="700">
                 OPEN TIKET
               </text>
             </svg>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          <div style={{ padding: "0 10px 8px 10px", display: "flex", flexDirection: "column" }}>
             <div
-              className="stat-pill"
+              className="exec-metric-row"
               onClick={() => setFilterWitel(filterWitel === "JAKBAR" ? "ALL" : "JAKBAR")}
               style={{
-                background: filterWitel === "JAKBAR" ? "#dbeafe" : "#eff6ff",
-                border: filterWitel === "JAKBAR" ? "1.5px solid #2563eb" : "1px solid #bfdbfe",
-                borderRadius: "99px",
-                padding: "5px 12px",
+                background: filterWitel === "JAKBAR" ? "#eff6ff" : "transparent",
+                borderTop: "1px solid #e2e8f0",
+                borderBottom: "1px solid #e2e8f0",
+                padding: "5px 4px",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                fontSize: "11.5px",
+                fontSize: "11px",
                 cursor: "pointer",
               }}
             >
-              <span style={{ color: "#1d4ed8", fontWeight: 700 }}>Witel JAKBAR</span>
-              <span style={{ color: "#1e3a8a", fontWeight: 800, fontSize: "12.5px" }}>{globalStats.jakbarCount}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e293b", fontWeight: 700 }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#1e3a8a", display: "inline-block" }} />
+                Witel JAKBAR
+              </span>
+              <span style={{ color: "#0f172a", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                {globalStats.jakbarCount}{" "}
+                <span style={{ color: "#64748b", fontWeight: 600, fontSize: "10px" }}>
+                  ({globalStats.jakbarSharePct}%)
+                </span>
+              </span>
             </div>
+
             <div
-              className="stat-pill"
+              className="exec-metric-row"
               onClick={() => setFilterWitel(filterWitel === "JAKUT" ? "ALL" : "JAKUT")}
               style={{
-                background: filterWitel === "JAKUT" ? "#dcfce7" : "#f0fdf4",
-                border: filterWitel === "JAKUT" ? "1.5px solid #16a34a" : "1px solid #bbf7d0",
-                borderRadius: "99px",
-                padding: "5px 12px",
+                background: filterWitel === "JAKUT" ? "#f0fdfa" : "transparent",
+                padding: "5px 4px",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                fontSize: "11.5px",
+                fontSize: "11px",
                 cursor: "pointer",
               }}
             >
-              <span style={{ color: "#15803d", fontWeight: 700 }}>Witel JAKUT</span>
-              <span style={{ color: "#14532d", fontWeight: 800, fontSize: "12.5px" }}>{globalStats.jakutCount}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e293b", fontWeight: 700 }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#0d9488", display: "inline-block" }} />
+                Witel JAKUT
+              </span>
+              <span style={{ color: "#0f172a", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                {globalStats.jakutCount}{" "}
+                <span style={{ color: "#64748b", fontWeight: 600, fontSize: "10px" }}>
+                  ({globalStats.jakutSharePct}%)
+                </span>
+              </span>
             </div>
           </div>
         </div>
 
         {/* KARTU 2: INDIKASI GAMAS (TICKET ID) */}
-        {renderCompactPillCard({
+        {renderExecutiveCard({
           title: "INDIKASI GAMAS (TICKET ID)",
-          titlePillBg: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
-          colHeaderPillBg: "#ffe4e6",
-          colHeaderTextColor: "#be123c",
           bigValue: globalStats.gamasTotal,
-          bigValueColor: "#dc2626",
-          defaultPillBg: "#fef2f2",
-          defaultPillActiveBg: "#fee2e2",
-          defaultPillBorder: "#fecaca",
-          defaultPillActiveBorder: "#dc2626",
-          defaultLabelColor: "#b91c1c",
-          defaultValueColor: "#7f1d1d",
-          rowStyleOverrides: {
-            "Non-Gamas": {
-              pillBg: "#f8fafc",
-              pillActiveBg: "#e2e8f0",
-              pillBorder: "#cbd5e1",
-              pillActiveBorder: "#475569",
-              labelColor: "#334155",
-              valueColor: "#0f172a",
+          bigValueColor: globalStats.gamasTotal > 0 ? "#b91c1c" : "#0f172a",
+          rowHighlightMap: {
+            "Tiket Gamas": {
+              labelColor: "#b91c1c",
+              valueColor: "#b91c1c",
+              alertBg: "#fef2f2",
             },
           },
           activeFilterValue:
@@ -1652,21 +1666,23 @@ export default function DashboardPage({
           },
         })}
 
-        {/* KARTU 3: SEGMEN */}
-        {renderCompactPillCard({
-          title: "SEGMEN",
-          titlePillBg: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-          colHeaderPillBg: "#fef3c7",
-          colHeaderTextColor: "#b45309",
-          bigValue: `HVC : ${globalStats.hvcTotal} | REG : ${globalStats.regTotal}`,
-          bigValueColor: "#d97706",
-          bigValueFontSize: "15.5px",
-          defaultPillBg: "#fffbeb",
-          defaultPillActiveBg: "#fef3c7",
-          defaultPillBorder: "#fde68a",
-          defaultPillActiveBorder: "#d97706",
-          defaultLabelColor: "#b45309",
-          defaultValueColor: "#78350f",
+        {/* KARTU 3: SEGMEN PELANGGAN */}
+        {renderExecutiveCard({
+          title: "SEGMEN PELANGGAN",
+          bigValue: (
+            <span style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a" }}>
+              HVC: {globalStats.hvcTotal}{" "}
+              <span style={{ color: "#64748b", fontWeight: 600, fontSize: "12px" }}>
+                ({globalStats.hvcSharePct}%)
+              </span>
+              <span style={{ margin: "0 6px", color: "#cbd5e1" }}>|</span>
+              REG: {globalStats.regTotal}{" "}
+              <span style={{ color: "#64748b", fontWeight: 600, fontSize: "12px" }}>
+                ({globalStats.regSharePct}%)
+              </span>
+            </span>
+          ),
+          bigValueFontSize: "14px",
           activeFilterValue: filterCustType !== "ALL" ? filterCustType : undefined,
           rows: globalStats.segmenRows,
           onRowClick: (label) => {
@@ -1675,19 +1691,10 @@ export default function DashboardPage({
         })}
 
         {/* KARTU 4: STATUS TIKET */}
-        {renderCompactPillCard({
+        {renderExecutiveCard({
           title: "STATUS TIKET",
-          titlePillBg: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
-          colHeaderPillBg: "#dbeafe",
-          colHeaderTextColor: "#1d4ed8",
           bigValue: globalStats.total,
-          bigValueColor: "#2563eb",
-          defaultPillBg: "#eff6ff",
-          defaultPillActiveBg: "#dbeafe",
-          defaultPillBorder: "#bfdbfe",
-          defaultPillActiveBorder: "#2563eb",
-          defaultLabelColor: "#1d4ed8",
-          defaultValueColor: "#1e3a8a",
+          bigValueColor: "#1e3a8a",
           activeFilterValue: filterStatus !== "ALL" ? filterStatus : undefined,
           rows: globalStats.statusRows,
           onRowClick: (label) => {
@@ -1696,68 +1703,23 @@ export default function DashboardPage({
         })}
 
         {/* KARTU 5: SERVICE TYPE */}
-        {renderCompactPillCard({
+        {renderExecutiveCard({
           title: "SERVICE TYPE",
-          titlePillBg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-          colHeaderPillBg: "#d1fae5",
-          colHeaderTextColor: "#047857",
           bigValue: globalStats.total,
-          bigValueColor: "#059669",
-          defaultPillBg: "#ecfdf5",
-          defaultPillActiveBg: "#d1fae5",
-          defaultPillBorder: "#a7f3d0",
-          defaultPillActiveBorder: "#059669",
-          defaultLabelColor: "#047857",
-          defaultValueColor: "#064e3b",
+          bigValueColor: "#0f172a",
           rows: globalStats.serviceRows,
         })}
 
         {/* KARTU 6: STATUS MANJA */}
-        {renderCompactPillCard({
+        {renderExecutiveCard({
           title: "STATUS MANJA",
-          titlePillBg: "linear-gradient(135deg, #84cc16 0%, #65a30d 100%)",
-          colHeaderPillBg: "#dcfce7",
-          colHeaderTextColor: "#15803d",
           bigValue: globalStats.total,
-          bigValueColor: "#16a34a",
-          defaultPillBg: "#f0fdf4",
-          defaultPillActiveBg: "#dcfce7",
-          defaultPillBorder: "#bbf7d0",
-          defaultPillActiveBorder: "#16a34a",
-          defaultLabelColor: "#15803d",
-          defaultValueColor: "#14532d",
-          rowStyleOverrides: {
-            "MANJA H+": {
-              pillBg: "#ecfeff",
-              pillActiveBg: "#cffafe",
-              pillBorder: "#a5f3fc",
-              pillActiveBorder: "#0891b2",
-              labelColor: "#0e7490",
-              valueColor: "#164e63",
-            },
-            "MANJA H++": {
-              pillBg: "#eff6ff",
-              pillActiveBg: "#dbeafe",
-              pillBorder: "#bfdbfe",
-              pillActiveBorder: "#2563eb",
-              labelColor: "#1d4ed8",
-              valueColor: "#1e3a8a",
-            },
-            "NON MANJA": {
-              pillBg: "#f8fafc",
-              pillActiveBg: "#e2e8f0",
-              pillBorder: "#cbd5e1",
-              pillActiveBorder: "#475569",
-              labelColor: "#334155",
-              valueColor: "#0f172a",
-            },
+          bigValueColor: "#0f172a",
+          rowHighlightMap: {
             "MANJA EXPIRED": {
-              pillBg: "#fef2f2",
-              pillActiveBg: "#fee2e2",
-              pillBorder: "#fecaca",
-              pillActiveBorder: "#dc2626",
               labelColor: "#b91c1c",
-              valueColor: "#7f1d1d",
+              valueColor: "#b91c1c",
+              alertBg: "#fef2f2",
             },
           },
           activeFilterValue: filterManja !== "ALL" ? filterManja : undefined,
@@ -1767,44 +1729,43 @@ export default function DashboardPage({
           },
         })}
 
-        {/* KARTU 7: STATUS TTR (SLA) */}
-        {renderCompactPillCard({
-          title: "STATUS TTR (SLA)",
-          titlePillBg: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
-          colHeaderPillBg: "#ede9fe",
-          colHeaderTextColor: "#5b21b6",
-          bigValue: globalStats.ttrExpiredTotal,
-          bigValueColor: "#dc2626",
-          defaultPillBg: "#f0fdf4",
-          defaultPillActiveBg: "#dcfce7",
-          defaultPillBorder: "#bbf7d0",
-          defaultPillActiveBorder: "#16a34a",
-          defaultLabelColor: "#15803d",
-          defaultValueColor: "#14532d",
-          rowStyleOverrides: {
-            "IN SLA": {
-              pillBg: "#f0fdf4",
-              pillActiveBg: "#dcfce7",
-              pillBorder: "#bbf7d0",
-              pillActiveBorder: "#16a34a",
-              labelColor: "#15803d",
-              valueColor: "#14532d",
-            },
+        {/* KARTU 7: STATUS TTR (SLA COMPLIANCE) */}
+        {renderExecutiveCard({
+          title: "STATUS TTR (SLA COMPLIANCE)",
+          bigValue: (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "18px", fontWeight: 800, color: "#0f172a" }}>
+                {globalStats.inSlaRatePct}%{" "}
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#0d9488" }}>IN SLA</span>
+              </span>
+              {globalStats.ttrExpiredTotal > 0 && (
+                <span
+                  style={{
+                    background: "#fee2e2",
+                    color: "#b91c1c",
+                    border: "1px solid #fecaca",
+                    fontSize: "10px",
+                    fontWeight: 800,
+                    padding: "1px 6px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  {globalStats.ttrExpiredTotal} Expired
+                </span>
+              )}
+            </div>
+          ),
+          bigValueFontSize: "18px",
+          rowHighlightMap: {
             "SLA Kritis": {
-              pillBg: "#fffbeb",
-              pillActiveBg: "#fef3c7",
-              pillBorder: "#fde68a",
-              pillActiveBorder: "#d97706",
               labelColor: "#b45309",
-              valueColor: "#78350f",
+              valueColor: "#b45309",
+              alertBg: "#fffbeb",
             },
             "TTR Expired": {
-              pillBg: "#fef2f2",
-              pillActiveBg: "#fee2e2",
-              pillBorder: "#fecaca",
-              pillActiveBorder: "#dc2626",
               labelColor: "#b91c1c",
-              valueColor: "#7f1d1d",
+              valueColor: "#b91c1c",
+              alertBg: "#fef2f2",
             },
           },
           activeFilterValue: filterTtr !== "ALL" ? filterTtr : undefined,
@@ -1835,7 +1796,7 @@ export default function DashboardPage({
           background: "#ffffff",
           padding: "10px 12px",
           borderRadius: "8px",
-          border: "1px solid #e2e8f0",
+          border: "1px solid #cbd5e1",
           boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
         }}
       >
@@ -1850,14 +1811,14 @@ export default function DashboardPage({
           }}
         >
           <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontWeight: 700, fontSize: "12.5px", color: "#0f172a", marginRight: "4px" }}>
+            <span style={{ fontWeight: 700, fontSize: "12px", color: "#0f172a", marginRight: "4px" }}>
               DETAIL TIKET ({filteredData.length})
             </span>
 
             <select
               value={filterWitel}
               onChange={(e) => setFilterWitel(e.target.value)}
-              style={{ padding: "4px 9px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Witel</option>
               {filterOptions.witels.map((w) => (
@@ -1868,7 +1829,7 @@ export default function DashboardPage({
             <select
               value={filterWorkzone}
               onChange={(e) => setFilterWorkzone(e.target.value)}
-              style={{ padding: "4px 9px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Workzone</option>
               {filterOptions.workzones.map((wz) => (
@@ -1879,7 +1840,7 @@ export default function DashboardPage({
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ padding: "4px 9px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Status</option>
               {filterOptions.statuses.map((st) => (
@@ -1890,7 +1851,7 @@ export default function DashboardPage({
             <select
               value={filterCustType}
               onChange={(e) => setFilterCustType(e.target.value)}
-              style={{ padding: "4px 9px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Segmen</option>
               {filterOptions.custTypes.map((ct) => (
@@ -1901,7 +1862,7 @@ export default function DashboardPage({
             <select
               value={filterGamas}
               onChange={(e) => setFilterGamas(e.target.value)}
-              style={{ padding: "4px 9px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Gamas</option>
               <option value="GAMAS">Hanya Tiket Gamas</option>
@@ -1911,7 +1872,7 @@ export default function DashboardPage({
             <select
               value={filterManja}
               onChange={(e) => setFilterManja(e.target.value)}
-              style={{ padding: "4px 9px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Status Manja</option>
               <option value="ANY_MANJA">Semua Manja (Booking)</option>
@@ -1923,7 +1884,7 @@ export default function DashboardPage({
             <select
               value={filterTtr}
               onChange={(e) => setFilterTtr(e.target.value)}
-              style={{ padding: "4px 9px", borderRadius: "99px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Status TTR</option>
               {CARD_TTR_ORDER.map((t) => (
@@ -1940,7 +1901,7 @@ export default function DashboardPage({
                   color: "#b91c1c",
                   border: "1px solid #fecaca",
                   padding: "4px 10px",
-                  borderRadius: "99px",
+                  borderRadius: "6px",
                   fontSize: "11.5px",
                   fontWeight: 600,
                   cursor: "pointer",
@@ -1956,7 +1917,7 @@ export default function DashboardPage({
             placeholder="Cari INCIDENT / SERVICE NO / CUSTOMER..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: "4px 11px", borderRadius: "99px", border: "1px solid #cbd5e1", width: "240px", fontSize: "11.5px" }}
+            style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", width: "235px", fontSize: "11.5px" }}
           />
         </div>
 
@@ -2014,7 +1975,7 @@ export default function DashboardPage({
 
                   return (
                     <tr key={row.incident} className="detail-row" style={{ borderBottom: "1px solid #e2e8f0" }}>
-                      <td style={{ ...tdStyle, fontWeight: 700, color: "#1d4ed8" }}>{row.incident}</td>
+                      <td style={{ ...tdStyle, fontWeight: 700, color: "#1e3a8a" }}>{row.incident}</td>
                       <td style={tdStyle}>{row.reported_date || "-"}</td>
                       <td style={tdStyle}>
                         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -2022,7 +1983,7 @@ export default function DashboardPage({
                             style={{
                               ...ttrBadgeStyle,
                               padding: "1.5px 7px",
-                              borderRadius: "99px",
+                              borderRadius: "4px",
                               fontSize: "10.5px",
                               fontWeight: 700,
                             }}
@@ -2040,7 +2001,7 @@ export default function DashboardPage({
                           style={{
                             ...manjaBadgeStyle,
                             padding: "1.5px 7px",
-                            borderRadius: "99px",
+                            borderRadius: "4px",
                             fontSize: "10.5px",
                             fontWeight: 700,
                           }}
@@ -2055,7 +2016,7 @@ export default function DashboardPage({
                         <span
                           style={{
                             padding: "1.5px 7px",
-                            borderRadius: "99px",
+                            borderRadius: "4px",
                             fontSize: "10.5px",
                             fontWeight: 700,
                             background: row.status === "BACKEND" ? "#dbeafe" : row.status === "DRAFT" ? "#fef3c7" : "#f1f5f9",

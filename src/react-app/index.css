@@ -40,22 +40,22 @@ body {
   background: #94a3b8;
 }
 
-/* Grid Responsif 5 Kartu Atas */
+/* Grid 6 Kartu Ringkasan: 2 Baris x 3 Kolom */
 .kpi-cards-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1024px) {
   .kpi-cards-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 680px) {
   .kpi-cards-grid {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
@@ -79,6 +79,13 @@ body {
 .stat-pill:hover {
   transform: translateY(-1px);
   filter: brightness(0.97);
+}
+
+.mini-matrix-row {
+  transition: background-color 0.12s ease;
+}
+.mini-matrix-row:hover {
+  filter: brightness(0.96);
 }
 
 .matrix-row {

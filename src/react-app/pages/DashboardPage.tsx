@@ -8,6 +8,41 @@ interface DashboardPageProps {
   lastSyncWib: string;
 }
 
+// DAFTAR WORKZONE & SEGMEN BAKU
+const BAKU_WZ_JAKUT = [
+  "CIL",
+  "MRD",
+  "KLG",
+  "KTX",
+  "KTZ",
+  "MKR",
+  "PDM",
+  "STR",
+  "TPR",
+];
+
+const BAKU_WZ_JAKBAR = [
+  "CKG",
+  "TGA",
+  "KPK",
+  "JIA",
+  "KSB",
+  "PLM",
+  "KDY",
+  "MRY",
+  "SLP",
+  "SMI",
+  "DTG",
+  "SDM",
+];
+
+const BAKU_SEGMEN = [
+  "HVC_DIAMOND",
+  "HVC_PLATINUM",
+  "HVC_GOLD",
+  "REGULER",
+];
+
 export default function DashboardPage({
   incidents,
   loading,
@@ -98,42 +133,40 @@ export default function DashboardPage({
     };
   }, [incidents]);
 
-  // Daftar urutan kolom Segmen untuk Tabel Matriks
+  // Daftar urutan kolom Segmen: 4 Segmen Baku selalu tampil + segmen ekstra jika ada
   const matrixSegments = useMemo(() => {
-    const preferredOrder = [
-      "HVC_DIAMOND",
-      "HVC_PLATINUM",
-      "HVC_GOLD",
-      "HVC_SILVER",
-      "REGULER",
-    ];
-    const found = Array.from(
-      new Set(incidents.map((i) => (i.customer_type || "UNKNOWN").toUpperCase()))
-    );
-    return found.sort((a, b) => {
-      const idxA = preferredOrder.indexOf(a);
-      const idxB = preferredOrder.indexOf(b);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return a.localeCompare(b);
-    });
+    const extraSegments = Array.from(
+      new Set(
+        incidents
+          .map((i) => (i.customer_type || "").toUpperCase().trim())
+          .filter((s) => s !== "" && !BAKU_SEGMEN.includes(s))
+      )
+    ).sort();
+    return [...BAKU_SEGMEN, ...extraSegments];
   }, [incidents]);
 
-  const formatSegmentHeader = (seg: string) =>
-    seg.replace("HVC_", "");
+  const formatSegmentHeader = (seg: string) => seg.replace("HVC_", "");
 
-  const buildWitelMatrix = (witelKeyword: string) => {
+  // Helper pembentuk data Matriks Workzone x Segmen menggunakan Daftar Baku
+  const buildWitelMatrix = (witelKeyword: string, standardWorkzones: string[]) => {
     const rows = incidents.filter((i) =>
       (i.witel || "").toUpperCase().includes(witelKeyword)
     );
+
     const wzMap: Record<string, Record<string, number>> = {};
     const colTotals: Record<string, number> = {};
     matrixSegments.forEach((s) => (colTotals[s] = 0));
 
+    // Inisialisasi seluruh Workzone baku dengan nilai 0
+    standardWorkzones.forEach((wz) => {
+      wzMap[wz] = {};
+      matrixSegments.forEach((s) => (wzMap[wz][s] = 0));
+    });
+
+    // Masukkan data tiket aktual
     rows.forEach((r) => {
-      const wz = (r.workzone || "N/A").toUpperCase();
-      const seg = (r.customer_type || "UNKNOWN").toUpperCase();
+      const wz = (r.workzone || "N/A").toUpperCase().trim();
+      const seg = (r.customer_type || "UNKNOWN").toUpperCase().trim();
       if (!wzMap[wz]) {
         wzMap[wz] = {};
         matrixSegments.forEach((s) => (wzMap[wz][s] = 0));
@@ -142,34 +175,48 @@ export default function DashboardPage({
       colTotals[seg] = (colTotals[seg] || 0) + 1;
     });
 
-    const sortedWorkzones = Object.entries(wzMap)
-      .map(([wz, counts]) => {
-        const rowTotal = Object.values(counts).reduce((a, b) => a + b, 0);
-        return { workzone: wz, counts, rowTotal };
-      })
-      .sort((a, b) => b.rowTotal - a.rowTotal);
+    // Pertahankan urutan Workzone sesuai daftar baku, lalu tambahkan STO ekstra jika ada
+    const extraWorkzones = Object.keys(wzMap).filter(
+      (wz) => !standardWorkzones.includes(wz)
+    );
+    const orderedWorkzoneKeys = [...standardWorkzones, ...extraWorkzones];
+
+    const workzonesList = orderedWorkzoneKeys.map((wz) => {
+      const counts = wzMap[wz];
+      const rowTotal = Object.values(counts).reduce((a, b) => a + b, 0);
+      return { workzone: wz, counts, rowTotal };
+    });
 
     return {
       totalTickets: rows.length,
-      workzones: sortedWorkzones,
+      workzones: workzonesList,
       colTotals,
     };
   };
 
   const jakutMatrix = useMemo(
-    () => buildWitelMatrix("JAKUT"),
+    () => buildWitelMatrix("JAKUT", BAKU_WZ_JAKUT),
     [incidents, matrixSegments]
   );
   const jakbarMatrix = useMemo(
-    () => buildWitelMatrix("JAKBAR"),
+    () => buildWitelMatrix("JAKBAR", BAKU_WZ_JAKBAR),
     [incidents, matrixSegments]
   );
 
+  // Filter untuk Tabel Detail Bawah
   const filterOptions = useMemo(() => {
     const witels = Array.from(new Set(incidents.map((i) => i.witel).filter(Boolean))).sort();
-    const workzones = Array.from(new Set(incidents.map((i) => i.workzone).filter(Boolean))).sort();
+    const workzones = Array.from(
+      new Set([
+        ...BAKU_WZ_JAKUT,
+        ...BAKU_WZ_JAKBAR,
+        ...incidents.map((i) => i.workzone).filter(Boolean),
+      ])
+    ).sort();
     const statuses = Array.from(new Set(incidents.map((i) => i.status).filter(Boolean))).sort();
-    const custTypes = Array.from(new Set(incidents.map((i) => i.customer_type).filter(Boolean))).sort();
+    const custTypes = Array.from(
+      new Set([...BAKU_SEGMEN, ...incidents.map((i) => i.customer_type).filter(Boolean)])
+    );
     return { witels, workzones, statuses, custTypes };
   }, [incidents]);
 
@@ -327,122 +374,126 @@ export default function DashboardPage({
             </tr>
           </thead>
           <tbody>
-            {matrix.workzones.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={matrixSegments.length + 3}
-                  style={{ padding: "20px", textAlign: "center", color: "#64748b", fontSize: "13px" }}
+            {matrix.workzones.map((row, idx) => {
+              const isSelected = filterWorkzone === row.workzone && filterWitel === witelCode;
+              const isZeroRow = row.rowTotal === 0;
+              return (
+                <tr
+                  key={row.workzone}
+                  className="matrix-row"
+                  onClick={() => {
+                    if (isSelected) {
+                      setFilterWorkzone("ALL");
+                      setFilterWitel("ALL");
+                    } else {
+                      setFilterWitel(witelCode);
+                      setFilterWorkzone(row.workzone);
+                    }
+                  }}
+                  style={{
+                    borderBottom: "1px solid #e2e8f0",
+                    background: isSelected ? "#eff6ff" : "#ffffff",
+                    cursor: "pointer",
+                  }}
+                  title="Klik untuk memfilter tabel detail berdasarkan Workzone ini"
                 >
-                  Tidak ada data tiket untuk {witelCode}.
-                </td>
-              </tr>
-            ) : (
-              <>
-                {matrix.workzones.map((row, idx) => {
-                  const isSelected = filterWorkzone === row.workzone && filterWitel === witelCode;
-                  return (
-                    <tr
-                      key={row.workzone}
-                      className="matrix-row"
-                      onClick={() => {
-                        if (isSelected) {
-                          setFilterWorkzone("ALL");
-                          setFilterWitel("ALL");
-                        } else {
-                          setFilterWitel(witelCode);
-                          setFilterWorkzone(row.workzone);
-                        }
-                      }}
-                      style={{
-                        borderBottom: "1px solid #e2e8f0",
-                        background: isSelected ? "#eff6ff" : "#ffffff",
-                        cursor: "pointer",
-                      }}
-                      title="Klik untuk memfilter tabel detail berdasarkan Workzone ini"
-                    >
-                      <td style={{ padding: "8px 10px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
-                        {idx + 1}
-                      </td>
-                      <td style={{ padding: "8px 10px", fontSize: "12.5px", fontWeight: 700, color: isSelected ? "#1d4ed8" : "#0f172a" }}>
-                        {row.workzone}
-                      </td>
-                      {matrixSegments.map((seg) => {
-                        const val = row.counts[seg] || 0;
-                        return (
-                          <td
-                            key={seg}
-                            style={{
-                              padding: "8px 8px",
-                              fontSize: "12.5px",
-                              textAlign: "center",
-                              fontWeight: val > 0 ? 700 : 400,
-                              color: val > 0 ? "#1e293b" : "#94a3b8",
-                            }}
-                          >
-                            {val}
-                          </td>
-                        );
-                      })}
-                      <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                        <span
-                          style={{
-                            background: isSelected ? "#2563eb" : "#dbeafe",
-                            border: "1px solid #93c5fd",
-                            color: isSelected ? "#ffffff" : "#1d4ed8",
-                            fontWeight: 800,
-                            fontSize: "12px",
-                            padding: "2px 10px",
-                            borderRadius: "99px",
-                            display: "inline-block",
-                            minWidth: "28px",
-                          }}
-                        >
-                          {row.rowTotal}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {/* BARIS GRAND TOTAL */}
-                <tr style={{ background: "#f1f5f9", borderTop: "2px solid #cbd5e1" }}>
-                  <td colSpan={2} style={{ padding: "10px 10px", fontSize: "12px", fontWeight: 800, color: "#0f172a" }}>
-                    GRAND TOTAL {witelCode}
+                  <td style={{ padding: "8px 10px", fontSize: "12px", fontWeight: 600, color: "#64748b" }}>
+                    {idx + 1}
                   </td>
-                  {matrixSegments.map((seg) => (
-                    <td
-                      key={seg}
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: "12.5px",
-                        fontWeight: 800,
-                        color: "#0f172a",
-                        textAlign: "center",
-                      }}
-                    >
-                      {matrix.colTotals[seg] || 0}
-                    </td>
-                  ))}
-                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                  <td style={{ padding: "8px 10px", fontSize: "12.5px", fontWeight: 700, color: isSelected ? "#1d4ed8" : "#0f172a" }}>
+                    {row.workzone}
+                  </td>
+                  {matrixSegments.map((seg) => {
+                    const val = row.counts[seg] || 0;
+                    return (
+                      <td
+                        key={seg}
+                        style={{
+                          padding: "8px 8px",
+                          fontSize: "12.5px",
+                          textAlign: "center",
+                          fontWeight: 700,
+                          // Angka 0 ditandai warna hijau (#16a34a), selain 0 warna gelap (#1e293b)
+                          color: val === 0 ? "#16a34a" : "#1e293b",
+                        }}
+                      >
+                        {val}
+                      </td>
+                    );
+                  })}
+                  <td style={{ padding: "8px 12px", textAlign: "center" }}>
                     <span
                       style={{
-                        background: "#dcfce7",
-                        border: "1px solid #86efac",
-                        color: "#15803d",
+                        background: isSelected
+                          ? "#2563eb"
+                          : isZeroRow
+                          ? "#dcfce7"
+                          : "#dbeafe",
+                        border: isSelected
+                          ? "1px solid #1d4ed8"
+                          : isZeroRow
+                          ? "1px solid #86efac"
+                          : "1px solid #93c5fd",
+                        color: isSelected
+                          ? "#ffffff"
+                          : isZeroRow
+                          ? "#15803d"
+                          : "#1d4ed8",
                         fontWeight: 800,
-                        fontSize: "12.5px",
-                        padding: "2px 11px",
+                        fontSize: "12px",
+                        padding: "2px 10px",
                         borderRadius: "99px",
                         display: "inline-block",
-                        minWidth: "30px",
+                        minWidth: "28px",
                       }}
                     >
-                      {matrix.totalTickets}
+                      {row.rowTotal}
                     </span>
                   </td>
                 </tr>
-              </>
-            )}
+              );
+            })}
+
+            {/* BARIS GRAND TOTAL */}
+            <tr style={{ background: "#f1f5f9", borderTop: "2px solid #cbd5e1" }}>
+              <td colSpan={2} style={{ padding: "10px 10px", fontSize: "12px", fontWeight: 800, color: "#0f172a" }}>
+                GRAND TOTAL {witelCode}
+              </td>
+              {matrixSegments.map((seg) => {
+                const colTotal = matrix.colTotals[seg] || 0;
+                return (
+                  <td
+                    key={seg}
+                    style={{
+                      padding: "10px 8px",
+                      fontSize: "12.5px",
+                      fontWeight: 800,
+                      color: colTotal === 0 ? "#16a34a" : "#0f172a",
+                      textAlign: "center",
+                    }}
+                  >
+                    {colTotal}
+                  </td>
+                );
+              })}
+              <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                <span
+                  style={{
+                    background: "#dcfce7",
+                    border: "1px solid #86efac",
+                    color: "#15803d",
+                    fontWeight: 800,
+                    fontSize: "12.5px",
+                    padding: "2px 11px",
+                    borderRadius: "99px",
+                    display: "inline-block",
+                    minWidth: "30px",
+                  }}
+                >
+                  {matrix.totalTickets}
+                </span>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -824,8 +875,8 @@ export default function DashboardPage({
 
       {/* 2 TABEL REKAP MATRIKS PER WITEL: WORKZONE X SEGMEN */}
       <div className="matrix-tables-grid" style={{ marginBottom: "20px" }}>
-        {renderMatrixCard("REKAP TIKET WITEL JAKUT", "JAKUT", jakutMatrix)}
-        {renderMatrixCard("REKAP TIKET WITEL JAKBAR", "JAKBAR", jakbarMatrix)}
+        {renderMatrixCard("REKAP TIKET WITEL JAKUT (WORKZONE × SEGMEN)", "JAKUT", jakutMatrix)}
+        {renderMatrixCard("REKAP TIKET WITEL JAKBAR (WORKZONE × SEGMEN)", "JAKBAR", jakbarMatrix)}
       </div>
 
       {/* TABEL DETAIL 14 KOLOM (DRILL-DOWN) */}

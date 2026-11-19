@@ -18,7 +18,11 @@ export default function SyncPage({
   const [search, setSearch] = useState("");
 
   const apiIngestUrl = `${window.location.origin}/api/ingest`;
-  const bookmarkletCode = `javascript:(async()=>{const t=document.querySelector('table');if(!t)return alert('Tabel tidak ditemukan di halaman ini!');const h=[...t.querySelectorAll('thead th, tr:first-child th')].map(e=>e.innerText.replace(/\\s+/g,' ').trim().toUpperCase());const rows=[...t.querySelectorAll('tbody tr')].map(tr=>{const td=[...tr.querySelectorAll('td')];const o={};h.forEach((k,i)=>{if(k&&td[i])o[k]=td[i].innerText.replace(/\\s+/g,' ').trim()});return o}).filter(r=>r.INCIDENT&&r.INCIDENT.startsWith('INC'));if(!rows.length)return alert('Tidak ada baris tiket INC ditemukan.');try{const res=await fetch('${apiIngestUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});const j=await res.json();alert(j.message||j.error)}catch(e){alert('Gagal mengirim data: '+e.message)}})();`;
+
+  // Bookmarklet mendukung Multi-Page:
+  // OK = Halaman 1 (Reset data lama & isi baru)
+  // Cancel = Halaman 2, 3, dst. (Append / gabungkan ke data sebelumnya tanpa menghapus halaman 1)
+  const bookmarkletCode = `javascript:(async()=>{const t=document.querySelector('table');if(!t)return alert('Tabel tidak ditemukan di halaman ini!');const h=[...t.querySelectorAll('thead th, tr:first-child th')].map(e=>e.innerText.replace(/\\s+/g,' ').trim().toUpperCase());const rows=[...t.querySelectorAll('tbody tr')].map(tr=>{const td=[...tr.querySelectorAll('td')];const o={};h.forEach((k,i)=>{if(k&&td[i])o[k]=td[i].innerText.replace(/\\s+/g,' ').trim()});return o}).filter(r=>r.INCIDENT&&r.INCIDENT.startsWith('INC'));if(!rows.length)return alert('Tidak ada baris tiket INC ditemukan.');const isFirst=confirm('Ditemukan '+rows.length+' tiket di halaman ini.\\n\\n• Klik OK = Kirim sebagai HALAMAN 1 (Hapus data lama & mulai baru)\\n• Klik Cancel = Kirim sebagai HALAMAN 2 / 3 / dst. (Gabungkan ke data sebelumnya)');try{const res=await fetch('${apiIngestUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:isFirst?1:2,mode:isFirst?'reset':'append',rows})});const j=await res.json();alert(j.message||j.error)}catch(e){alert('Gagal mengirim data: '+e.message)}})();`;
 
   const handleCopyBookmarklet = () => {
     navigator.clipboard.writeText(bookmarkletCode);
@@ -60,7 +64,7 @@ export default function SyncPage({
           Collect & Sinkronisasi Data Tiket
         </h1>
         <p style={{ color: "#64748b", fontSize: "13.5px", marginTop: "4px" }}>
-          Halaman khusus penarikan data dari portal sumber ke database Cloudflare D1 (Mode Mirroring).
+          Penarikan data dari portal sumber ke database Cloudflare D1 (Mendukung Multi-Halaman / &gt;100 Tiket).
         </p>
       </div>
 
@@ -75,7 +79,7 @@ export default function SyncPage({
         }}
       >
         <h2 style={{ fontSize: "15px", fontWeight: 700, marginTop: 0, marginBottom: "10px" }}>
-          1. Bookmarklet Penarik Data (1-Klik)
+          1. Bookmarklet Penarik Data (Multi-Page Ready)
         </h2>
         <ol
           style={{
@@ -88,10 +92,15 @@ export default function SyncPage({
         >
           <li>Klik tombol <strong>Copy Kode Bookmarklet</strong> di bawah.</li>
           <li>
-            Buat bookmark baru di Bookmarks Bar Chrome (<code>Ctrl+Shift+B</code> / <code>Cmd+Shift+B</code> → klik kanan → <strong>Add page...</strong>).
+            Buat atau edit bookmark di Bookmarks Bar Chrome (<code>Ctrl+Shift+B</code> / <code>Cmd+Shift+B</code> → klik kanan → <strong>Edit...</strong> / <strong>Add page...</strong>).
           </li>
-          <li>Tempel kode tersebut pada kolom <strong>URL</strong>, beri nama <code>Kirim ke Dashboard KPI</code>, lalu simpan.</li>
-          <li>Buka portal tiket yang sudah login dan klik bookmark tersebut untuk mengganti isi database dengan data terbaru.</li>
+          <li>Tempel kode baru pada kolom <strong>URL</strong>, beri nama <code>Kirim ke Dashboard KPI</code>, lalu simpan.</li>
+          <li>
+            Buka <strong>Halaman 1</strong> di portal tiket, klik bookmark lalu pilih <strong>OK (Halaman 1 / Reset)</strong>.
+          </li>
+          <li>
+            Jika tiket lebih dari 100, pindah ke <strong>Halaman 2</strong> (dan seterusnya) di portal tiket, klik bookmark lagi lalu pilih <strong>Cancel (Gabungkan ke data sebelumnya)</strong>.
+          </li>
         </ol>
 
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>

@@ -1,152 +1,73 @@
-import { useState, useEffect, useMemo } from "react";
-import { Incident } from "./types";
+import { useState, useEffect, useCallback } from "react";
 import DashboardPage from "./pages/DashboardPage";
-import SyncPage from "./pages/SyncPage";
+import { Incident } from "./types";
+import { fetchAllIncidents } from "./services/incidentService";
+
+function formatWibNow(): string {
+  return (
+    new Date().toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }) + " WIB"
+  );
+}
 
 export default function App() {
-  const [route, setRoute] = useState<string>(() => window.location.pathname);
   const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastSyncWib, setLastSyncWib] = useState<string>("-");
 
-  // Sinkronkan tombol Back/Forward browser dengan state route
-  useEffect(() => {
-    const handlePopState = () => setRoute(window.location.pathname);
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
-  const navigate = (path: string) => {
-    window.history.pushState({}, "", path);
-    setRoute(path);
-  };
-
-  const fetchIncidents = async () => {
+  const loadAllData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch("/api/incidents");
-      const json = await res.json();
-      if (json.success) {
-        setIncidents(json.data);
-      }
+      const allTickets = await fetchAllIncidents();
+      // Update state sekaligus setelah seluruh halaman (page 1..N) selesai dikumpulkan
+      setIncidents(allTickets);
+      setLastSyncWib(formatWibNow());
     } catch (err) {
-      console.error("Gagal memuat data:", err);
+      const message =
+        err instanceof Error ? err.message : "Terjadi kesalahan saat memuat data.";
+      setError(message);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchIncidents();
   }, []);
 
-  const lastSyncWib = useMemo(() => {
-    if (!incidents.length || !incidents[0].synced_at) return "-";
-    try {
-      const utcDate = new Date(incidents[0].synced_at.replace(" ", "T") + "Z");
-      return (
-        utcDate.toLocaleString("id-ID", {
-          timeZone: "Asia/Jakarta",
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }) + " WIB"
-      );
-    } catch {
-      return incidents[0].synced_at;
-    }
-  }, [incidents]);
-
-  const isSyncPage = route === "/sync";
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
 
   return (
-    <div
-      style={{
-        background: "#f1f5f9",
-        minHeight: "100vh",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        color: "#0f172a",
-      }}
-    >
-      {/* TOP NAVIGATION BAR */}
-      <nav
-        style={{
-          background: "#0f172a",
-          color: "#fff",
-          padding: "0 24px",
-          height: "54px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
-          <span style={{ fontWeight: 800, fontSize: "15px", letterSpacing: "0.3px" }}>
-            OSS Incident Monitor
-          </span>
-
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              type="button"
-              onClick={() => navigate("/")}
-              style={{
-                background: !isSyncPage ? "#2563eb" : "transparent",
-                color: !isSyncPage ? "#fff" : "#cbd5e1",
-                border: "none",
-                padding: "7px 14px",
-                borderRadius: "6px",
-                fontSize: "13px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Dashboard Reporting
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate("/sync")}
-              style={{
-                background: isSyncPage ? "#2563eb" : "transparent",
-                color: isSyncPage ? "#fff" : "#cbd5e1",
-                border: "none",
-                padding: "7px 14px",
-                borderRadius: "6px",
-                fontSize: "13px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Collect Data (Sync)
-            </button>
-          </div>
+    <>
+      {error && (
+        <div
+          style={{
+            background: "#fee2e2",
+            color: "#991b1b",
+            borderBottom: "1px solid #fecaca",
+            padding: "8px 16px",
+            fontSize: "12.5px",
+            fontWeight: 600,
+            textAlign: "center",
+          }}
+        >
+          {error}
         </div>
-
-        <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-          {incidents.length} Tiket Aktif
-        </div>
-      </nav>
-
-      {/* RENDER HALAMAN SESUAI RUTE */}
-      {isSyncPage ? (
-        <SyncPage
-          incidents={incidents}
-          loading={loading}
-          onRefresh={fetchIncidents}
-          lastSyncWib={lastSyncWib}
-        />
-      ) : (
-        <DashboardPage
-          incidents={incidents}
-          loading={loading}
-          onRefresh={fetchIncidents}
-          lastSyncWib={lastSyncWib}
-        />
       )}
-    </div>
+
+      <DashboardPage
+        incidents={incidents}
+        loading={loading}
+        onRefresh={loadAllData}
+        lastSyncWib={lastSyncWib}
+      />
+    </>
   );
 }

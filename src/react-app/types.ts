@@ -1,6 +1,7 @@
 export interface Incident {
   incident: string;
   reported_date: string;
+  booking_date: string;
   service_type: string;
   witel: string;
   workzone: string;

@@ -40,16 +40,16 @@ app.post("/api/ingest", async (c) => {
     // 1. Siapkan statement penghapusan seluruh data lama
     const deleteStmt = c.env.DB.prepare("DELETE FROM incidents");
 
-    // 2. Siapkan statement insert data terbaru
+    // 2. Siapkan statement insert data terbaru (termasuk booking_date)
     const insertStmt = c.env.DB.prepare(`
       INSERT INTO incidents (
-        incident, reported_date, service_type, witel, workzone,
+        incident, reported_date, booking_date, service_type, witel, workzone,
         status, status_date, ticket_id_gamas, contact_phone, contact_name,
         customer_type, customer_name, service_no, symptom,
         summary, owner_group, owner, customer_segment, lapul, gaul,
         onu_rx, datemodified, technician, ttr_end_to_end, synced_at
       ) VALUES (
-        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
@@ -58,13 +58,13 @@ app.post("/api/ingest", async (c) => {
     `);
 
     const insertBatch = validRows.map((r) => {
-      // Ambil murni dari kolom TICKET ID GAMAS; jika blank/kosong, isi dengan "-"
       const rawGamas = (r["TICKET ID GAMAS"] || "").trim();
       const ticketIdGamas = rawGamas !== "" ? rawGamas : "-";
 
       return insertStmt.bind(
         r["INCIDENT"] || "",
         r["REPORTED DATE"] || "",
+        r["BOOKING DATE"] || "",
         r["SERVICE TYPE"] || "",
         r["WITEL"] || "",
         r["WORKZONE"] || "",

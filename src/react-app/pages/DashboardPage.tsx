@@ -55,38 +55,44 @@ const CARD_MANJA_ORDER = ["MANJA HI", "MANJA H++", "NON MANJA", "MANJA EXP"];
 
 type ManjaCategory = "MANJA HI" | "MANJA H++" | "NON MANJA" | "MANJA EXP";
 
-// Helper parsing tanggal WIB (Asia/Jakarta) & klasifikasi Status Manja dari BOOKING DATE
+// Klasifikasi Status Manja dari kolom BOOKING DATE (WIB)
 function classifyStatusManja(bookingDateRaw?: string): ManjaCategory {
   const raw = (bookingDateRaw || "").trim();
   if (!raw || raw === "-" || raw.toLowerCase() === "null") {
     return "NON MANJA";
   }
 
-  // Ambil tanggal hari ini dalam zona waktu WIB (YYYY-MM-DD)
   const now = new Date();
   const todayWibStr = now.toLocaleDateString("en-CA", {
     timeZone: "Asia/Jakarta",
-  }); // format YYYY-MM-DD
+  });
 
-  // Coba parse format umum: "YYYY-MM-DD HH:mm:ss" atau "DD-MM-YYYY HH:mm:ss" atau "DD/MM/YYYY HH:mm"
   let parsedDate: Date | null = null;
   let bookingDateOnlyStr = "";
 
-  const isoMatch = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
-  const dmyMatch = raw.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  const isoMatch = raw.match(
+    /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/
+  );
+  const dmyMatch = raw.match(
+    /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/
+  );
 
   if (isoMatch) {
     const [, y, m, d, hh = "23", mm = "59", ss = "59"] = isoMatch;
     const padM = m.padStart(2, "0");
     const padD = d.padStart(2, "0");
     bookingDateOnlyStr = `${y}-${padM}-${padD}`;
-    parsedDate = new Date(`${y}-${padM}-${padD}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:${ss.padStart(2, "0")}+07:00`);
+    parsedDate = new Date(
+      `${y}-${padM}-${padD}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:${ss.padStart(2, "0")}+07:00`
+    );
   } else if (dmyMatch) {
     const [, d, m, y, hh = "23", mm = "59", ss = "59"] = dmyMatch;
     const padM = m.padStart(2, "0");
     const padD = d.padStart(2, "0");
     bookingDateOnlyStr = `${y}-${padM}-${padD}`;
-    parsedDate = new Date(`${y}-${padM}-${padD}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:${ss.padStart(2, "0")}+07:00`);
+    parsedDate = new Date(
+      `${y}-${padM}-${padD}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:${ss.padStart(2, "0")}+07:00`
+    );
   } else {
     const fallback = new Date(raw);
     if (!isNaN(fallback.getTime())) {
@@ -109,7 +115,6 @@ function classifyStatusManja(bookingDateRaw?: string): ManjaCategory {
     return "MANJA EXP";
   }
 
-  // Tanggal sama dengan hari ini (todayWibStr): cek apakah jam booking sudah terlewat
   if (parsedDate.getTime() < now.getTime()) {
     return "MANJA EXP";
   }
@@ -117,7 +122,7 @@ function classifyStatusManja(bookingDateRaw?: string): ManjaCategory {
   return "MANJA HI";
 }
 
-interface MiniMatrixRow {
+interface PillRowItem {
   label: string;
   jakbar: number;
   jakut: number;
@@ -166,7 +171,7 @@ export default function DashboardPage({
     });
   }, []);
 
-  // Kalkulasi Global & Matriks Mini (Jakbar | Jakut | Total) untuk 6 Kartu Atas
+  // Kalkulasi Global untuk 6 Kartu Atas
   const globalStats = useMemo(() => {
     const total = incidents.length;
     let jakutCount = 0;
@@ -245,7 +250,7 @@ export default function DashboardPage({
     const toRows = (
       map: Record<string, { jakbar: number; jakut: number }>,
       orderedKeys: string[]
-    ): MiniMatrixRow[] => {
+    ): PillRowItem[] => {
       const extraKeys = Object.keys(map).filter((k) => !orderedKeys.includes(k));
       return [...orderedKeys, ...extraKeys].map((k) => {
         const item = map[k] || { jakbar: 0, jakut: 0 };
@@ -287,7 +292,6 @@ export default function DashboardPage({
 
   const formatSegmentHeader = (seg: string) => seg.replace("HVC_", "");
 
-  // Helper pembentuk data Matriks Workzone x Segmen
   const buildWitelMatrix = (witelKeyword: string, standardWorkzones: string[]) => {
     const rows = incidents.filter((i) =>
       (i.witel || "").toUpperCase().includes(witelKeyword)
@@ -431,17 +435,21 @@ export default function DashboardPage({
   const jakutStroke = jakutPct * circumference;
   const jakbarStroke = jakbarPct * circumference;
 
-  // Component Reusable untuk Kartu Matriks Mini (Jakbar | Jakut | Total)
-  const renderStatMatrixCard = (params: {
+  // Component Reusable untuk Kartu Model Pill Bar (seperti gambar)
+  const renderPillCard = (params: {
     title: string;
     headerBg: string;
     bigValue: string | number;
     bigValueColor: string;
     bigValueFontSize?: string;
-    borderColor: string;
+    pillBg: string;
+    pillActiveBg: string;
+    pillBorder: string;
+    pillActiveBorder: string;
     labelColor: string;
+    valueColor: string;
     activeFilterValue?: string;
-    rows: MiniMatrixRow[];
+    rows: PillRowItem[];
     onRowClick?: (label: string) => void;
   }) => {
     const {
@@ -450,8 +458,12 @@ export default function DashboardPage({
       bigValue,
       bigValueColor,
       bigValueFontSize = "32px",
-      borderColor,
+      pillBg,
+      pillActiveBg,
+      pillBorder,
+      pillActiveBorder,
       labelColor,
+      valueColor,
       activeFilterValue,
       rows,
       onRowClick,
@@ -499,121 +511,58 @@ export default function DashboardPage({
           {bigValue}
         </div>
 
-        {/* Tabel Mini: Label | Jakbar | Jakut | Total */}
-        <div style={{ padding: "0 12px 12px 12px" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "12px",
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ padding: "4px 6px", textAlign: "left" }} />
-                <th
-                  style={{
-                    padding: "4px 6px",
-                    textAlign: "center",
-                    fontWeight: 700,
-                    fontSize: "11.5px",
-                    color: "#dc2626",
-                    width: "56px",
-                  }}
-                >
-                  Jakbar
-                </th>
-                <th
-                  style={{
-                    padding: "4px 6px",
-                    textAlign: "center",
-                    fontWeight: 700,
-                    fontSize: "11.5px",
-                    color: "#dc2626",
-                    width: "56px",
-                  }}
-                >
-                  Jakut
-                </th>
-                <th
-                  style={{
-                    padding: "4px 6px",
-                    textAlign: "center",
-                    fontWeight: 700,
-                    fontSize: "11.5px",
-                    color: "#dc2626",
-                    width: "56px",
-                  }}
-                >
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const isSelected = activeFilterValue === r.label;
-                return (
-                  <tr
-                    key={r.label}
-                    className={onRowClick ? "mini-matrix-row" : undefined}
-                    onClick={() => onRowClick && onRowClick(r.label)}
+        {/* Daftar Pill Bar per Kategori (Pertahankan model pill pada gambar) */}
+        <div
+          style={{
+            padding: "0 14px 14px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px",
+          }}
+        >
+          {rows.map((r) => {
+            const isSelected = activeFilterValue === r.label;
+            return (
+              <div
+                key={r.label}
+                className="stat-pill"
+                onClick={() => onRowClick && onRowClick(r.label)}
+                style={{
+                  background: isSelected ? pillActiveBg : pillBg,
+                  border: isSelected ? `1.5px solid ${pillActiveBorder}` : `1px solid ${pillBorder}`,
+                  borderRadius: "7px",
+                  padding: "6px 12px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontSize: "12.5px",
+                  cursor: onRowClick ? "pointer" : "default",
+                }}
+                title={onRowClick ? `Klik untuk filter ${r.label} (Jakbar: ${r.jakbar}, Jakut: ${r.jakut})` : undefined}
+              >
+                <span style={{ color: labelColor, fontWeight: 700 }}>{r.label}</span>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span
                     style={{
-                      cursor: onRowClick ? "pointer" : "default",
-                      background: isSelected ? "#f1f5f9" : "#ffffff",
+                      fontSize: "10.5px",
+                      fontWeight: 600,
+                      color: "#64748b",
+                      background: "rgba(255,255,255,0.75)",
+                      padding: "1px 6px",
+                      borderRadius: "4px",
                     }}
-                    title={onRowClick ? `Klik untuk filter ${r.label}` : undefined}
                   >
-                    <td
-                      style={{
-                        border: `1px solid ${borderColor}`,
-                        padding: "5px 8px",
-                        fontWeight: 700,
-                        fontSize: "11.5px",
-                        color: labelColor,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {r.label}
-                    </td>
-                    <td
-                      style={{
-                        border: `1px solid ${borderColor}`,
-                        padding: "5px 6px",
-                        textAlign: "center",
-                        fontWeight: r.jakbar > 0 ? 700 : 500,
-                        color: r.jakbar === 0 ? "#16a34a" : "#0f172a",
-                      }}
-                    >
-                      {r.jakbar}
-                    </td>
-                    <td
-                      style={{
-                        border: `1px solid ${borderColor}`,
-                        padding: "5px 6px",
-                        textAlign: "center",
-                        fontWeight: r.jakut > 0 ? 700 : 500,
-                        color: r.jakut === 0 ? "#16a34a" : "#0f172a",
-                      }}
-                    >
-                      {r.jakut}
-                    </td>
-                    <td
-                      style={{
-                        border: `1px solid ${borderColor}`,
-                        padding: "5px 6px",
-                        textAlign: "center",
-                        fontWeight: 800,
-                        color: r.total === 0 ? "#16a34a" : "#0f172a",
-                        background: "#f8fafc",
-                      }}
-                    >
-                      {r.total}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    JB:{r.jakbar} | JU:{r.jakut}
+                  </span>
+                  <span style={{ color: valueColor, fontWeight: 800, minWidth: "22px", textAlign: "right" }}>
+                    {r.total}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -912,7 +861,7 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* GRID 6 KARTU RINGKASAN (2 BARIS x 3 KOLOM) */}
+      {/* GRID 6 KARTU RINGKASAN (2 BARIS x 3 KOLOM - MODEL PILL BAR) */}
       <div className="kpi-cards-grid" style={{ marginBottom: "20px" }}>
         {/* KARTU 1: TOTAL TIKET AKTIF + DONUT CHART */}
         <div
@@ -975,7 +924,7 @@ export default function DashboardPage({
               style={{
                 background: filterWitel === "JAKBAR" ? "#dbeafe" : "#eff6ff",
                 border: filterWitel === "JAKBAR" ? "1.5px solid #2563eb" : "1px solid #bfdbfe",
-                borderRadius: "6px",
+                borderRadius: "7px",
                 padding: "6px 12px",
                 display: "flex",
                 justifyContent: "space-between",
@@ -992,7 +941,7 @@ export default function DashboardPage({
               style={{
                 background: filterWitel === "JAKUT" ? "#dcfce7" : "#f0fdf4",
                 border: filterWitel === "JAKUT" ? "1.5px solid #16a34a" : "1px solid #bbf7d0",
-                borderRadius: "6px",
+                borderRadius: "7px",
                 padding: "6px 12px",
                 display: "flex",
                 justifyContent: "space-between",
@@ -1007,13 +956,17 @@ export default function DashboardPage({
         </div>
 
         {/* KARTU 2: INDIKASI GAMAS (TICKET ID) */}
-        {renderStatMatrixCard({
+        {renderPillCard({
           title: "INDIKASI GAMAS (TICKET ID)",
           headerBg: "#e11d48",
           bigValue: globalStats.gamasTotal,
           bigValueColor: "#dc2626",
-          borderColor: "#fecdd3",
-          labelColor: "#be123c",
+          pillBg: "#fef2f2",
+          pillActiveBg: "#fee2e2",
+          pillBorder: "#fecaca",
+          pillActiveBorder: "#dc2626",
+          labelColor: "#b91c1c",
+          valueColor: "#7f1d1d",
           activeFilterValue:
             filterGamas === "GAMAS"
               ? "Tiket Gamas"
@@ -1031,14 +984,18 @@ export default function DashboardPage({
         })}
 
         {/* KARTU 3: SEGMEN */}
-        {renderStatMatrixCard({
+        {renderPillCard({
           title: "SEGMEN",
-          headerBg: "#eab308",
+          headerBg: "#d97706",
           bigValue: `HVC : ${globalStats.hvcTotal} | REG : ${globalStats.regTotal}`,
           bigValueColor: "#d97706",
           bigValueFontSize: "22px",
-          borderColor: "#fde68a",
+          pillBg: "#fffbeb",
+          pillActiveBg: "#fef3c7",
+          pillBorder: "#fde68a",
+          pillActiveBorder: "#d97706",
           labelColor: "#b45309",
+          valueColor: "#78350f",
           activeFilterValue: filterCustType !== "ALL" ? filterCustType : undefined,
           rows: globalStats.segmenRows,
           onRowClick: (label) => {
@@ -1047,13 +1004,17 @@ export default function DashboardPage({
         })}
 
         {/* KARTU 4: STATUS TIKET */}
-        {renderStatMatrixCard({
+        {renderPillCard({
           title: "STATUS TIKET",
-          headerBg: "#0284c7",
+          headerBg: "#2563eb",
           bigValue: globalStats.total,
           bigValueColor: "#2563eb",
-          borderColor: "#bfdbfe",
+          pillBg: "#eff6ff",
+          pillActiveBg: "#dbeafe",
+          pillBorder: "#bfdbfe",
+          pillActiveBorder: "#2563eb",
           labelColor: "#1d4ed8",
+          valueColor: "#1e3a8a",
           activeFilterValue: filterStatus !== "ALL" ? filterStatus : undefined,
           rows: globalStats.statusRows,
           onRowClick: (label) => {
@@ -1062,24 +1023,32 @@ export default function DashboardPage({
         })}
 
         {/* KARTU 5: SERVICE TYPE */}
-        {renderStatMatrixCard({
+        {renderPillCard({
           title: "SERVICE TYPE",
-          headerBg: "#65a30d",
+          headerBg: "#059669",
           bigValue: globalStats.total,
           bigValueColor: "#059669",
-          borderColor: "#a7f3d0",
+          pillBg: "#ecfdf5",
+          pillActiveBg: "#d1fae5",
+          pillBorder: "#a7f3d0",
+          pillActiveBorder: "#059669",
           labelColor: "#047857",
+          valueColor: "#064e3b",
           rows: globalStats.serviceRows,
         })}
 
         {/* KARTU 6: STATUS MANJA */}
-        {renderStatMatrixCard({
+        {renderPillCard({
           title: "STATUS MANJA",
-          headerBg: "#65a30d",
+          headerBg: "#16a34a",
           bigValue: globalStats.total,
-          bigValueColor: "#059669",
-          borderColor: "#a7f3d0",
-          labelColor: "#047857",
+          bigValueColor: "#16a34a",
+          pillBg: "#f0fdf4",
+          pillActiveBg: "#dcfce7",
+          pillBorder: "#bbf7d0",
+          pillActiveBorder: "#16a34a",
+          labelColor: "#15803d",
+          valueColor: "#14532d",
           activeFilterValue: filterManja !== "ALL" ? filterManja : undefined,
           rows: globalStats.manjaRows,
           onRowClick: (label) => {
@@ -1094,7 +1063,7 @@ export default function DashboardPage({
         {renderMatrixCard("REKAP TIKET WITEL JAKBAR (WORKZONE × SEGMEN)", "JAKBAR", jakbarMatrix)}
       </div>
 
-      {/* TABEL DETAIL 15 KOLOM (DRILL-DOWN) */}
+      {/* TABEL DETAIL 16 KOLOM (DRILL-DOWN) */}
       <div
         style={{
           background: "#ffffff",

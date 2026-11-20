@@ -62,7 +62,8 @@ const CARD_MANJA_ORDER = [
 ];
 const CARD_TTR_ORDER = ["IN SLA", "SLA Kritis", "TTR Expired"];
 
-const POTENSI_GAMAS_THRESHOLD = 3;
+const POTENSI_DEVICE_THRESHOLD = 3;
+const POTENSI_RK_THRESHOLD = 5;
 
 const MONTH_NAME_MAP: Record<string, string> = {
   JAN: "01",
@@ -128,8 +129,10 @@ interface EnrichedIncident extends Incident {
   _searchBlob: string;
 }
 
-interface DeviceClusterInfo {
-  key: string;
+interface InfraClusterInfo {
+  id: string;
+  type: "DEV" | "RK";
+  rawName: string;
   label: string;
   witel: string;
   workzone: string;
@@ -313,7 +316,7 @@ function classifyStatusManja(bookingDateRaw?: string): ManjaCategory {
   return "MANJA H++";
 }
 
-function normalizeDeviceValue(val?: string): string {
+function normalizeInfraValue(val?: string): string {
   const cleaned = (val || "").trim().toUpperCase();
   if (
     !cleaned ||
@@ -364,6 +367,12 @@ export default function DashboardPage({
   const [filterManja, setFilterManja] = useState("ALL");
   const [filterTtr, setFilterTtr] = useState("ALL");
   const [filterUrgency, setFilterUrgency] = useState("ALL");
+  const [activeClusterFilter, setActiveClusterFilter] = useState<{
+    id: string;
+    type: "DEV" | "RK";
+    rawName: string;
+    workzone: string;
+  } | null>(null);
   const [waCopied, setWaCopied] = useState(false);
   const [showAllRows, setShowAllRows] = useState(false);
 
@@ -380,6 +389,7 @@ export default function DashboardPage({
     filterManja,
     filterTtr,
     filterUrgency,
+    activeClusterFilter,
   ]);
 
   const hasActiveFilter =
@@ -391,6 +401,7 @@ export default function DashboardPage({
     filterManja !== "ALL" ||
     filterTtr !== "ALL" ||
     filterUrgency !== "ALL" ||
+    activeClusterFilter !== null ||
     search.trim() !== "";
 
   const resetFilters = () => {
@@ -403,6 +414,7 @@ export default function DashboardPage({
     setFilterManja("ALL");
     setFilterTtr("ALL");
     setFilterUrgency("ALL");
+    setActiveClusterFilter(null);
   };
 
   const todayTitle = useMemo(() => {
@@ -414,9 +426,10 @@ export default function DashboardPage({
     });
   }, []);
 
-  // 1. Pra-Komputasi Seluruh Tiket (Cluster DEVICE NAME Per-STO, TTR, Manja, dan Search Index)
+  // 1. Pra-Komputasi Seluruh Tiket (Cluster DEVICE >= 3 & RK >= 5 Per-STO)
   const { enrichedIncidents, topClusters, invalidDateCount } = useMemo(() => {
     const deviceCountMap: Record<string, number> = {};
+    const rkCountMap: Record<string, number> = {};
 
     incidents.forEach((row) => {
       const hasOfficialGamas = Boolean(
@@ -429,18 +442,20 @@ export default function DashboardPage({
       const scope = `${(row.witel || "").toUpperCase().trim()}_${(row.workzone || "")
         .toUpperCase()
         .trim()}`;
-      const dev = normalizeDeviceValue(row.device_name);
+      const dev = normalizeInfraValue(row.device_name);
+      const rk = normalizeInfraValue(row.rk_information);
 
       if (dev) {
         const scopedDev = `${scope}|${dev}`;
         deviceCountMap[scopedDev] = (deviceCountMap[scopedDev] || 0) + 1;
       }
+      if (rk) {
+        const scopedRk = `${scope}|${rk}`;
+        rkCountMap[scopedRk] = (rkCountMap[scopedRk] || 0) + 1;
+      }
     });
 
-    const clusterTracker: Record<
-      string,
-      { label: string; searchKey: string; witel: string; workzone: string; count: number }
-    > = {};
+    const clusterTracker: Record<string, InfraClusterInfo> = {};
     let badDateCount = 0;
 
     const enriched: EnrichedIncident[] = incidents.map((row) => {
@@ -463,24 +478,47 @@ export default function DashboardPage({
         const wtUpper = (row.witel || "").toUpperCase().trim();
         const wzUpper = (row.workzone || "").toUpperCase().trim();
         const scope = `${wtUpper}_${wzUpper}`;
-        const dev = normalizeDeviceValue(row.device_name);
+        const dev = normalizeInfraValue(row.device_name);
+        const rk = normalizeInfraValue(row.rk_information);
 
         const devCount = dev ? deviceCountMap[`${scope}|${dev}`] || 0 : 0;
+        const rkCount = rk ? rkCountMap[`${scope}|${rk}`] || 0 : 0;
 
-        if (dev && devCount >= POTENSI_GAMAS_THRESHOLD) {
+        const isDevPotensi = dev !== "" && devCount >= POTENSI_DEVICE_THRESHOLD;
+        const isRkPotensi = rk !== "" && rkCount >= POTENSI_RK_THRESHOLD;
+
+        if (isDevPotensi || isRkPotensi) {
           gamasCat = "POTENSI_GAMAS";
 
-          const clusterKey = `${scope}|DEV:${dev}`;
-          if (!clusterTracker[clusterKey]) {
-            clusterTracker[clusterKey] = {
-              label: dev,
-              searchKey: dev,
-              witel: wtUpper,
-              workzone: wzUpper,
-              count: 0,
-            };
+          if (isDevPotensi) {
+            const devClusterId = `${scope}|DEV:${dev}`;
+            if (!clusterTracker[devClusterId]) {
+              clusterTracker[devClusterId] = {
+                id: devClusterId,
+                type: "DEV",
+                rawName: dev,
+                label: `[DEV] ${dev}`,
+                witel: wtUpper,
+                workzone: wzUpper,
+                count: devCount,
+              };
+            }
           }
-          clusterTracker[clusterKey].count += 1;
+
+          if (isRkPotensi) {
+            const rkClusterId = `${scope}|RK:${rk}`;
+            if (!clusterTracker[rkClusterId]) {
+              clusterTracker[rkClusterId] = {
+                id: rkClusterId,
+                type: "RK",
+                rawName: rk,
+                label: `[RK] ${rk}`,
+                witel: wtUpper,
+                workzone: wzUpper,
+                count: rkCount,
+              };
+            }
+          }
         }
       }
 
@@ -510,15 +548,9 @@ export default function DashboardPage({
       };
     });
 
-    const clusters: DeviceClusterInfo[] = Object.entries(clusterTracker)
-      .map(([key, item]) => ({
-        key: item.searchKey || key,
-        label: item.label,
-        witel: item.witel,
-        workzone: item.workzone,
-        count: item.count,
-      }))
-      .sort((a, b) => b.count - a.count);
+    const clusters: InfraClusterInfo[] = Object.values(clusterTracker).sort(
+      (a, b) => b.count - a.count
+    );
 
     return {
       enrichedIncidents: enriched,
@@ -871,6 +903,21 @@ export default function DashboardPage({
       if (filterUrgency !== "ALL" && (item.urgency || "").trim() !== filterUrgency) return false;
       if (filterGamas !== "ALL" && item._gamasCat !== filterGamas) return false;
 
+      if (activeClusterFilter) {
+        if ((item.workzone || "").toUpperCase().trim() !== activeClusterFilter.workzone) {
+          return false;
+        }
+        if (activeClusterFilter.type === "DEV") {
+          if (normalizeInfraValue(item.device_name) !== activeClusterFilter.rawName) {
+            return false;
+          }
+        } else {
+          if (normalizeInfraValue(item.rk_information) !== activeClusterFilter.rawName) {
+            return false;
+          }
+        }
+      }
+
       if (filterManja !== "ALL") {
         if (filterManja === "ANY_MANJA") {
           if (item._manja === "NON MANJA") return false;
@@ -895,6 +942,7 @@ export default function DashboardPage({
     filterManja,
     filterTtr,
     filterUrgency,
+    activeClusterFilter,
     search,
   ]);
 
@@ -1485,6 +1533,7 @@ export default function DashboardPage({
                   extraFilter: { gamas?: string; manja?: string; ttr?: string }
                 ) => {
                   e.stopPropagation();
+                  setActiveClusterFilter(null);
                   setFilterWitel(witelCode);
                   setFilterWorkzone(row.workzone);
                   setFilterGamas(extraFilter.gamas || "ALL");
@@ -1497,6 +1546,7 @@ export default function DashboardPage({
                     key={row.workzone}
                     className="matrix-row"
                     onClick={() => {
+                      setActiveClusterFilter(null);
                       if (isSelected) {
                         setFilterWorkzone("ALL");
                         setFilterWitel("ALL");
@@ -1627,7 +1677,7 @@ export default function DashboardPage({
                         background: row.potensiGamas > 0 ? "#fef3c7" : undefined,
                         ...formatMatrixZero(row.potensiGamas, "#b45309", true),
                       }}
-                      title={`Filter ${row.workzone} - Potensi Gamas (Cluster Device Name)`}
+                      title={`Filter ${row.workzone} - Potensi Gamas (Device ≥ 3 atau RK ≥ 5)`}
                     >
                       {row.potensiGamas}
                     </td>
@@ -2193,6 +2243,7 @@ export default function DashboardPage({
                   : undefined,
               rows: globalStats.gamasRows,
               onRowClick: (label) => {
+                setActiveClusterFilter(null);
                 if (label === "Tiket Gamas") {
                   setFilterGamas(filterGamas === "GAMAS" ? "ALL" : "GAMAS");
                 } else if (label === "Potensi Gamas") {
@@ -2300,7 +2351,7 @@ export default function DashboardPage({
             })}
           </div>
 
-          {/* PANEL DETEKSI CLUSTER DEVICE NAME PER-STO */}
+          {/* PANEL DETEKSI CLUSTER [DEV] ≥ 3 & [RK] ≥ 5 PER-STO */}
           <div
             className="kpi-card"
             style={{
@@ -2324,7 +2375,7 @@ export default function DashboardPage({
                 letterSpacing: "0.4px",
               }}
             >
-              <span>POTENSI GAMAS (CLUSTER DEVICE NAME)</span>
+              <span>POTENSI GAMAS (CLUSTER)</span>
               <span
                 style={{
                   background: "rgba(255,255,255,0.2)",
@@ -2333,38 +2384,41 @@ export default function DashboardPage({
                   fontSize: "8.5px",
                 }}
               >
-                ≥ {POTENSI_GAMAS_THRESHOLD} Tiket / STO
+                DEV ≥ {POTENSI_DEVICE_THRESHOLD} | RK ≥ {POTENSI_RK_THRESHOLD}
               </span>
             </div>
 
             <div style={{ padding: "6px 8px" }}>
               {topClusters.length === 0 ? (
                 <div style={{ fontSize: "10.5px", color: "#64748b", textAlign: "center", padding: "6px 4px" }}>
-                  Tidak ada akumulasi ≥ {POTENSI_GAMAS_THRESHOLD} tiket pada 1 Device Name dalam satu STO.
+                  Tidak ada akumulasi DEV ≥ {POTENSI_DEVICE_THRESHOLD} atau RK ≥ {POTENSI_RK_THRESHOLD} dalam satu STO.
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                  {topClusters.slice(0, 4).map((cl) => {
-                    const isClusterFiltered =
-                      search.toUpperCase() === cl.key.toUpperCase() &&
-                      filterWorkzone === cl.workzone;
+                  {topClusters.slice(0, 5).map((cl) => {
+                    const isClusterFiltered = activeClusterFilter?.id === cl.id;
                     return (
                       <div
-                        key={`${cl.workzone}_${cl.label}`}
+                        key={cl.id}
                         onClick={() => {
                           if (isClusterFiltered) {
-                            setSearch("");
+                            setActiveClusterFilter(null);
                             setFilterWorkzone("ALL");
                             setFilterGamas("ALL");
                           } else {
-                            setSearch(cl.key);
+                            setActiveClusterFilter({
+                              id: cl.id,
+                              type: cl.type,
+                              rawName: cl.rawName,
+                              workzone: cl.workzone,
+                            });
                             setFilterWorkzone(cl.workzone);
                             setFilterGamas("POTENSI_GAMAS");
                           }
                         }}
                         style={{
-                          background: isClusterFiltered ? "#fef3c7" : "#fffbeb",
-                          border: "1px solid #fde68a",
+                          background: isClusterFiltered ? "#fde68a" : "#fffbeb",
+                          border: isClusterFiltered ? "1.5px solid #d97706" : "1px solid #fde68a",
                           borderRadius: "5px",
                           padding: "4px 7px",
                           display: "flex",
@@ -2373,7 +2427,7 @@ export default function DashboardPage({
                           gap: "6px",
                           cursor: "pointer",
                         }}
-                        title="Klik untuk memfilter tiket pada cluster device ini"
+                        title="Klik untuk memfilter tiket pada cluster ini"
                       >
                         <div style={{ minWidth: 0 }}>
                           <div
@@ -2394,7 +2448,7 @@ export default function DashboardPage({
                         </div>
                         <span
                           style={{
-                            background: "#d97706",
+                            background: cl.type === "DEV" ? "#d97706" : "#b45309",
                             color: "#ffffff",
                             fontSize: "9.5px",
                             fontWeight: 800,
@@ -2455,6 +2509,22 @@ export default function DashboardPage({
               DETAIL TIKET ({filteredData.length})
             </span>
 
+            {activeClusterFilter && (
+              <span
+                style={{
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  border: "1px solid #fcd34d",
+                  padding: "3px 8px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                }}
+              >
+                Cluster: [{activeClusterFilter.type}] {activeClusterFilter.rawName}
+              </span>
+            )}
+
             <select
               value={filterWitel}
               onChange={(e) => setFilterWitel(e.target.value)}
@@ -2468,7 +2538,10 @@ export default function DashboardPage({
 
             <select
               value={filterWorkzone}
-              onChange={(e) => setFilterWorkzone(e.target.value)}
+              onChange={(e) => {
+                setActiveClusterFilter(null);
+                setFilterWorkzone(e.target.value);
+              }}
               style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Workzone</option>
@@ -2501,12 +2574,15 @@ export default function DashboardPage({
 
             <select
               value={filterGamas}
-              onChange={(e) => setFilterGamas(e.target.value)}
+              onChange={(e) => {
+                setActiveClusterFilter(null);
+                setFilterGamas(e.target.value);
+              }}
               style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
             >
               <option value="ALL">Semua Status Gamas</option>
               <option value="GAMAS">Tiket Gamas (ID Resmi)</option>
-              <option value="POTENSI_GAMAS">Potensi Gamas (Device Name)</option>
+              <option value="POTENSI_GAMAS">Potensi Gamas (DEV ≥ 3 / RK ≥ 5)</option>
               <option value="NON_GAMAS">Non-Gamas</option>
             </select>
 
@@ -2732,7 +2808,7 @@ export default function DashboardPage({
                       <td style={tdStyle}>{row.customer_name || "-"}</td>
                       <td style={tdStyle}>{row.service_no || "-"}</td>
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{row.device_name || "-"}</td>
-                      <td style={tdStyle}>{row.rk_information || "-"}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{row.rk_information || "-"}</td>
                       <td style={tdStyle}>
                         {row.urgency && row.urgency !== "-" ? (
                           <span

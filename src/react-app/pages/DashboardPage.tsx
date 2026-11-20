@@ -62,7 +62,7 @@ const CARD_MANJA_ORDER = [
 ];
 const CARD_TTR_ORDER = ["IN SLA", "SLA Kritis", "TTR Expired"];
 
-const POTENSI_DEVICE_THRESHOLD = 3;
+const POTENSI_DEVICE_THRESHOLD = 2;
 const POTENSI_RK_THRESHOLD = 5;
 
 const MONTH_NAME_MAP: Record<string, string> = {
@@ -426,7 +426,7 @@ export default function DashboardPage({
     });
   }, []);
 
-  // 1. Pra-Komputasi Seluruh Tiket (Cluster DEVICE >= 3 & RK >= 5 Per-STO)
+  // 1. Pra-Komputasi Seluruh Tiket (Cluster DEVICE >= 2 & RK >= 5 Per-STO)
   const { enrichedIncidents, topClusters, invalidDateCount } = useMemo(() => {
     const deviceCountMap: Record<string, number> = {};
     const rkCountMap: Record<string, number> = {};
@@ -1677,7 +1677,7 @@ export default function DashboardPage({
                         background: row.potensiGamas > 0 ? "#fef3c7" : undefined,
                         ...formatMatrixZero(row.potensiGamas, "#b45309", true),
                       }}
-                      title={`Filter ${row.workzone} - Potensi Gamas (Device ≥ 3 atau RK ≥ 5)`}
+                      title={`Filter ${row.workzone} - Potensi Gamas (Device ≥ 2 atau RK ≥ 5)`}
                     >
                       {row.potensiGamas}
                     </td>
@@ -2351,7 +2351,7 @@ export default function DashboardPage({
             })}
           </div>
 
-          {/* PANEL DETEKSI CLUSTER [DEV] ≥ 3 & [RK] ≥ 5 PER-STO */}
+          {/* PANEL DETEKSI CLUSTER [DEV] ≥ 2 & [RK] ≥ 5 PER-STO */}
           <div
             className="kpi-card"
             style={{
@@ -2582,7 +2582,7 @@ export default function DashboardPage({
             >
               <option value="ALL">Semua Status Gamas</option>
               <option value="GAMAS">Tiket Gamas (ID Resmi)</option>
-              <option value="POTENSI_GAMAS">Potensi Gamas (DEV ≥ 3 / RK ≥ 5)</option>
+              <option value="POTENSI_GAMAS">Potensi Gamas (DEV ≥ 2 / RK ≥ 5)</option>
               <option value="NON_GAMAS">Non-Gamas</option>
             </select>
 

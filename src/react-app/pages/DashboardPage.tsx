@@ -426,8 +426,8 @@ export default function DashboardPage({
     });
   }, []);
 
-  // 1. Pra-Komputasi Seluruh Tiket (Cluster DEVICE >= 2 & RK >= 3 Per-STO)
-  const { enrichedIncidents, topClusters, invalidDateCount } = useMemo(() => {
+  // 1. Pra-Komputasi Seluruh Tiket (Cluster DEVICE >= 2 & RK >= 3 Per-STO, otomatis sort)
+  const { enrichedIncidents, rkClusters, devClusters, invalidDateCount } = useMemo(() => {
     const deviceCountMap: Record<string, number> = {};
     const rkCountMap: Record<string, number> = {};
 
@@ -497,7 +497,7 @@ export default function DashboardPage({
                 id: devClusterId,
                 type: "DEV",
                 rawName: dev,
-                label: `[DEV] ${dev}`,
+                label: dev,
                 witel: wtUpper,
                 workzone: wzUpper,
                 count: devCount,
@@ -512,7 +512,7 @@ export default function DashboardPage({
                 id: rkClusterId,
                 type: "RK",
                 rawName: rk,
-                label: `[RK] ${rk}`,
+                label: rk,
                 witel: wtUpper,
                 workzone: wzUpper,
                 count: rkCount,
@@ -548,13 +548,17 @@ export default function DashboardPage({
       };
     });
 
-    const clusters: InfraClusterInfo[] = Object.values(clusterTracker).sort(
-      (a, b) => b.count - a.count
-    );
+    const sortClusterFn = (a: InfraClusterInfo, b: InfraClusterInfo) =>
+      b.count - a.count || a.rawName.localeCompare(b.rawName);
+
+    const allClusters = Object.values(clusterTracker);
+    const rkList = allClusters.filter((c) => c.type === "RK").sort(sortClusterFn);
+    const devList = allClusters.filter((c) => c.type === "DEV").sort(sortClusterFn);
 
     return {
       enrichedIncidents: enriched,
-      topClusters: clusters,
+      rkClusters: rkList,
+      devClusters: devList,
       invalidDateCount: badDateCount,
     };
   }, [incidents]);
@@ -1951,6 +1955,141 @@ export default function DashboardPage({
     );
   };
 
+  const renderSplitClusterColumn = (
+    columnTitle: string,
+    items: InfraClusterInfo[],
+    emptyText: string,
+    badgeBg: string
+  ) => (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
+        background: "#ffffff",
+        border: "1px solid #fde68a",
+        borderRadius: "6px",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          background: "#fef3c7",
+          borderBottom: "1px solid #fde68a",
+          padding: "3.5px 6px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontSize: "8.5px",
+          fontWeight: 800,
+          color: "#92400e",
+          letterSpacing: "0.3px",
+        }}
+      >
+        <span>{columnTitle}</span>
+        <span>({items.length})</span>
+      </div>
+
+      <div
+        style={{
+          maxHeight: "175px",
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {items.length === 0 ? (
+          <div
+            style={{
+              padding: "10px 6px",
+              fontSize: "9.5px",
+              color: "#94a3b8",
+              textAlign: "center",
+            }}
+          >
+            {emptyText}
+          </div>
+        ) : (
+          items.map((cl, idx) => {
+            const isClusterFiltered = activeClusterFilter?.id === cl.id;
+            const isLast = idx === items.length - 1;
+            return (
+              <div
+                key={cl.id}
+                onClick={() => {
+                  if (isClusterFiltered) {
+                    setActiveClusterFilter(null);
+                    setFilterWorkzone("ALL");
+                    setFilterGamas("ALL");
+                  } else {
+                    setActiveClusterFilter({
+                      id: cl.id,
+                      type: cl.type,
+                      rawName: cl.rawName,
+                      workzone: cl.workzone,
+                    });
+                    setFilterWorkzone(cl.workzone);
+                    setFilterGamas("POTENSI_GAMAS");
+                  }
+                }}
+                style={{
+                  padding: "4px 6px",
+                  borderBottom: isLast ? "none" : "1px solid #fef3c7",
+                  background: isClusterFiltered ? "#fde68a" : "#fffbeb",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+                title={`${cl.label} (${cl.witel} • ${cl.workzone}) - ${cl.count} Tiket. Klik untuk filter tabel detail.`}
+              >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: "9.5px",
+                      fontWeight: 800,
+                      color: "#92400e",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {cl.label}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "8.5px",
+                      color: "#b45309",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {cl.witel} • {cl.workzone}
+                  </div>
+                </div>
+                <span
+                  style={{
+                    background: isClusterFiltered ? "#92400e" : badgeBg,
+                    color: "#ffffff",
+                    fontSize: "9px",
+                    fontWeight: 800,
+                    padding: "1px 5px",
+                    borderRadius: "4px",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {cl.count}
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
   const thStyle: React.CSSProperties = {
     padding: "6px 10px",
     whiteSpace: "nowrap",
@@ -1967,6 +2106,8 @@ export default function DashboardPage({
     fontSize: "11.5px",
     color: "#334155",
   };
+
+  const hasAnyCluster = rkClusters.length > 0 || devClusters.length > 0;
 
   return (
     <div style={{ width: "100%", maxWidth: "1320px", margin: "0 auto", padding: "8px 12px" }}>
@@ -2351,20 +2492,20 @@ export default function DashboardPage({
             })}
           </div>
 
-          {/* PANEL DETEKSI CLUSTER [DEV] ≥ 2 & [RK] ≥ 3 PER-STO */}
+          {/* PANEL DETEKSI CLUSTER SPLIT 2 KOLOM: BY RK (≥ 3) | BY DEVICE NAME (≥ 2) */}
           <div
             className="kpi-card"
             style={{
               background: "#ffffff",
               borderRadius: "8px",
-              border: topClusters.length > 0 ? "1px solid #fcd34d" : "1px solid #cbd5e1",
+              border: hasAnyCluster ? "1px solid #fcd34d" : "1px solid #cbd5e1",
               overflow: "hidden",
               boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
             }}
           >
             <div
               style={{
-                background: topClusters.length > 0 ? "#92400e" : "#1e293b",
+                background: hasAnyCluster ? "#92400e" : "#1e293b",
                 padding: "4.5px 10px",
                 display: "flex",
                 justifyContent: "space-between",
@@ -2384,85 +2525,36 @@ export default function DashboardPage({
                   fontSize: "8.5px",
                 }}
               >
-                DEV ≥ {POTENSI_DEVICE_THRESHOLD} | RK ≥ {POTENSI_RK_THRESHOLD}
+                RK ≥ {POTENSI_RK_THRESHOLD} | DEV ≥ {POTENSI_DEVICE_THRESHOLD}
               </span>
             </div>
 
-            <div style={{ padding: "6px 8px" }}>
-              {topClusters.length === 0 ? (
+            <div style={{ padding: "6px" }}>
+              {!hasAnyCluster ? (
                 <div style={{ fontSize: "10.5px", color: "#64748b", textAlign: "center", padding: "6px 4px" }}>
-                  Tidak ada akumulasi DEV ≥ {POTENSI_DEVICE_THRESHOLD} atau RK ≥ {POTENSI_RK_THRESHOLD} dalam satu STO.
+                  Tidak ada akumulasi RK ≥ {POTENSI_RK_THRESHOLD} atau DEV ≥ {POTENSI_DEVICE_THRESHOLD} dalam satu STO.
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                  {topClusters.slice(0, 5).map((cl) => {
-                    const isClusterFiltered = activeClusterFilter?.id === cl.id;
-                    return (
-                      <div
-                        key={cl.id}
-                        onClick={() => {
-                          if (isClusterFiltered) {
-                            setActiveClusterFilter(null);
-                            setFilterWorkzone("ALL");
-                            setFilterGamas("ALL");
-                          } else {
-                            setActiveClusterFilter({
-                              id: cl.id,
-                              type: cl.type,
-                              rawName: cl.rawName,
-                              workzone: cl.workzone,
-                            });
-                            setFilterWorkzone(cl.workzone);
-                            setFilterGamas("POTENSI_GAMAS");
-                          }
-                        }}
-                        style={{
-                          background: isClusterFiltered ? "#fde68a" : "#fffbeb",
-                          border: isClusterFiltered ? "1.5px solid #d97706" : "1px solid #fde68a",
-                          borderRadius: "5px",
-                          padding: "4px 7px",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: "6px",
-                          cursor: "pointer",
-                        }}
-                        title="Klik untuk memfilter tiket pada cluster ini"
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: "10px",
-                              fontWeight: 800,
-                              color: "#92400e",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {cl.label}
-                          </div>
-                          <div style={{ fontSize: "9px", color: "#b45309", fontWeight: 600 }}>
-                            {cl.witel} • {cl.workzone}
-                          </div>
-                        </div>
-                        <span
-                          style={{
-                            background: cl.type === "DEV" ? "#d97706" : "#b45309",
-                            color: "#ffffff",
-                            fontSize: "9.5px",
-                            fontWeight: 800,
-                            padding: "1.5px 6px",
-                            borderRadius: "4px",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {cl.count} Tiket
-                        </span>
-                      </div>
-                    );
-                  })}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "6px",
+                    alignItems: "start",
+                  }}
+                >
+                  {renderSplitClusterColumn(
+                    `BY RK (≥ ${POTENSI_RK_THRESHOLD})`,
+                    rkClusters,
+                    `Nihil RK ≥ ${POTENSI_RK_THRESHOLD}`,
+                    "#b45309"
+                  )}
+                  {renderSplitClusterColumn(
+                    `BY DEVICE (≥ ${POTENSI_DEVICE_THRESHOLD})`,
+                    devClusters,
+                    `Nihil DEV ≥ ${POTENSI_DEVICE_THRESHOLD}`,
+                    "#d97706"
+                  )}
                 </div>
               )}
             </div>
@@ -2521,7 +2613,7 @@ export default function DashboardPage({
                   fontWeight: 700,
                 }}
               >
-                Cluster: [{activeClusterFilter.type}] {activeClusterFilter.rawName}
+                Cluster {activeClusterFilter.type === "RK" ? "RK" : "Device"}: {activeClusterFilter.rawName}
               </span>
             )}
 

@@ -14,5 +14,8 @@ export interface Incident {
   customer_name: string;
   service_no: string;
   symptom: string;
+  device_name: string;
+  rk_information: string;
+  urgency: string;
   synced_at: string;
 }

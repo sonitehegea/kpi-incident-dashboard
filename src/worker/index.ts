@@ -43,16 +43,12 @@ app.post("/api/ingest", async (c) => {
         incident, reported_date, booking_date, service_type, witel, workzone,
         status, status_date, ticket_id_gamas, contact_phone, contact_name,
         customer_type, customer_name, service_no, symptom,
-        device_name, rk_information, urgency,
-        summary, owner_group, owner, customer_segment, lapul, gaul,
-        onu_rx, datemodified, technician, ttr_end_to_end, synced_at
+        device_name, rk_information, urgency, synced_at
       ) VALUES (
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, datetime('now')
+        ?, ?, ?, datetime('now')
       )
       ON CONFLICT(incident) DO UPDATE SET
         reported_date = excluded.reported_date,
@@ -97,17 +93,7 @@ app.post("/api/ingest", async (c) => {
         r["SYMPTOM"] || "",
         r["DEVICE NAME"] || "",
         r["RK INFORMATION"] || "",
-        r["URGENCY"] || r["URGENCY DESCRIPTION"] || "",
-        r["SUMMARY"] || "",
-        r["OWNER GROUP"] || "",
-        r["OWNER"] || "",
-        r["CUSTOMER SEGMENT"] || "",
-        parseInt(r["LAPUL"] || "0", 10) || 0,
-        parseInt(r["GAUL"] || "0", 10) || 0,
-        r["ONU RX"] || "",
-        r["DATEMODIFIED"] || "",
-        r["TECHNICIAN"] || "",
-        r["TTR END TO END"] || ""
+        r["URGENCY"] || r["URGENCY DESCRIPTION"] || ""
       );
     });
 
@@ -137,12 +123,19 @@ app.post("/api/ingest", async (c) => {
   }
 });
 
-// ENDPOINT 2: Ambil seluruh data dari Database D1
+// ENDPOINT 2: Ambil kolom aktif saja dari D1 (Hemat Payload ~45%) + waktu sync aktual
 app.get("/api/incidents", async (c) => {
   try {
-    const { results } = await c.env.DB.prepare(
-      "SELECT * FROM incidents ORDER BY reported_date DESC LIMIT 2000"
-    ).all();
+    const { results } = await c.env.DB.prepare(`
+      SELECT
+        incident, reported_date, booking_date, service_type, witel, workzone,
+        status, status_date, ticket_id_gamas, contact_phone, contact_name,
+        customer_type, customer_name, service_no, symptom,
+        device_name, rk_information, urgency, synced_at
+      FROM incidents
+      ORDER BY reported_date DESC
+      LIMIT 2000
+    `).all();
 
     return c.json({
       success: true,

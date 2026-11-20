@@ -570,6 +570,9 @@ export default function DashboardPage({
           (item.customer_name || "").toLowerCase().includes(q) ||
           (item.contact_name || "").toLowerCase().includes(q) ||
           (item.ticket_id_gamas || "").toLowerCase().includes(q) ||
+          (item.device_name || "").toLowerCase().includes(q) ||
+          (item.rk_information || "").toLowerCase().includes(q) ||
+          (item.urgency || "").toLowerCase().includes(q) ||
           (item.symptom || "").toLowerCase().includes(q);
         if (!match) return false;
       }
@@ -607,6 +610,9 @@ export default function DashboardPage({
       "CUSTOMER TYPE",
       "CUSTOMER NAME",
       "SERVICE NO",
+      "DEVICE NAME",
+      "RK INFORMATION",
+      "URGENCY",
       "SYMPTOM",
     ];
     const csvRows = [
@@ -631,6 +637,9 @@ export default function DashboardPage({
           r.customer_type,
           r.customer_name,
           r.service_no,
+          r.device_name,
+          r.rk_information,
+          r.urgency,
           r.symptom,
         ]
           .map((val) => `"${(val || "").replace(/"/g, '""')}"`)
@@ -1790,7 +1799,7 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* TABEL DETAIL 17 KOLOM */}
+      {/* TABEL DETAIL 20 KOLOM (TERMASUK DEVICE NAME, RK INFORMATION, URGENCY) */}
       <div
         style={{
           background: "#ffffff",
@@ -1914,10 +1923,10 @@ export default function DashboardPage({
 
           <input
             type="text"
-            placeholder="Cari INCIDENT / SERVICE NO / CUSTOMER..."
+            placeholder="Cari INCIDENT / DEVICE / RK / URGENCY..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", width: "235px", fontSize: "11.5px" }}
+            style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", width: "245px", fontSize: "11.5px" }}
           />
         </div>
 
@@ -1941,13 +1950,16 @@ export default function DashboardPage({
                 <th style={thStyle}>CUSTOMER TYPE</th>
                 <th style={thStyle}>CUSTOMER NAME</th>
                 <th style={thStyle}>SERVICE NO</th>
+                <th style={thStyle}>DEVICE NAME</th>
+                <th style={thStyle}>RK INFORMATION</th>
+                <th style={thStyle}>URGENCY</th>
                 <th style={thStyle}>SYMPTOM</th>
               </tr>
             </thead>
             <tbody>
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={17} style={{ padding: "20px", textAlign: "center", color: "#64748b", fontSize: "12.5px" }}>
+                  <td colSpan={20} style={{ padding: "20px", textAlign: "center", color: "#64748b", fontSize: "12.5px" }}>
                     Tidak ada data tiket yang sesuai dengan filter saat ini.
                   </td>
                 </tr>
@@ -2041,6 +2053,9 @@ export default function DashboardPage({
                       <td style={tdStyle}>{row.customer_type || "-"}</td>
                       <td style={tdStyle}>{row.customer_name || "-"}</td>
                       <td style={tdStyle}>{row.service_no || "-"}</td>
+                      <td style={tdStyle}>{row.device_name || "-"}</td>
+                      <td style={tdStyle}>{row.rk_information || "-"}</td>
+                      <td style={tdStyle}>{row.urgency || "-"}</td>
                       <td
                         style={{ ...tdStyle, maxWidth: "240px", overflow: "hidden", textOverflow: "ellipsis" }}
                         title={row.symptom}

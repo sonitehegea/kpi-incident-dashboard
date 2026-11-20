@@ -16,14 +16,12 @@ app.use(
   })
 );
 
-// ENDPOINT 1: Ingest Data dari Bookmarklet (Mendukung Multi-Page / Halaman 1, 2, 3, dst.)
+// ENDPOINT 1: Menerima data JSON dari Bookmarklet (Mendukung Multi-Page Reset & Append)
 app.post("/api/ingest", async (c) => {
   try {
     const body = await c.req.json();
     const parsedRows: Record<string, string>[] = body.rows || [];
-    const pageNumber = Number(body.page || 1);
-    const isAppendMode =
-      body.mode === "append" || (Number.isFinite(pageNumber) && pageNumber > 1);
+    const mode: string = body.mode || "reset";
 
     if (!Array.isArray(parsedRows) || parsedRows.length === 0) {
       return c.json({ error: "Tidak ada data tiket yang dikirim." }, 400);
@@ -40,21 +38,41 @@ app.post("/api/ingest", async (c) => {
       );
     }
 
-    // Gunakan INSERT OR REPLACE agar tiket yang sama tidak duplikat jika halaman bergeser
     const insertStmt = c.env.DB.prepare(`
-      INSERT OR REPLACE INTO incidents (
+      INSERT INTO incidents (
         incident, reported_date, booking_date, service_type, witel, workzone,
         status, status_date, ticket_id_gamas, contact_phone, contact_name,
         customer_type, customer_name, service_no, symptom,
+        device_name, rk_information, urgency,
         summary, owner_group, owner, customer_segment, lapul, gaul,
         onu_rx, datemodified, technician, ttr_end_to_end, synced_at
       ) VALUES (
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
+        ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, datetime('now')
       )
+      ON CONFLICT(incident) DO UPDATE SET
+        reported_date = excluded.reported_date,
+        booking_date = excluded.booking_date,
+        service_type = excluded.service_type,
+        witel = excluded.witel,
+        workzone = excluded.workzone,
+        status = excluded.status,
+        status_date = excluded.status_date,
+        ticket_id_gamas = excluded.ticket_id_gamas,
+        contact_phone = excluded.contact_phone,
+        contact_name = excluded.contact_name,
+        customer_type = excluded.customer_type,
+        customer_name = excluded.customer_name,
+        service_no = excluded.service_no,
+        symptom = excluded.symptom,
+        device_name = excluded.device_name,
+        rk_information = excluded.rk_information,
+        urgency = excluded.urgency,
+        synced_at = datetime('now')
     `);
 
     const insertBatch = validRows.map((r) => {
@@ -62,7 +80,7 @@ app.post("/api/ingest", async (c) => {
       const ticketIdGamas = rawGamas !== "" ? rawGamas : "-";
 
       return insertStmt.bind(
-        (r["INCIDENT"] || "").trim(),
+        r["INCIDENT"] || "",
         r["REPORTED DATE"] || "",
         r["BOOKING DATE"] || "",
         r["SERVICE TYPE"] || "",
@@ -77,6 +95,9 @@ app.post("/api/ingest", async (c) => {
         r["CUSTOMER NAME"] || "",
         r["SERVICE NO"] || "",
         r["SYMPTOM"] || "",
+        r["DEVICE NAME"] || "",
+        r["RK INFORMATION"] || "",
+        r["URGENCY"] || r["URGENCY DESCRIPTION"] || "",
         r["SUMMARY"] || "",
         r["OWNER GROUP"] || "",
         r["OWNER"] || "",
@@ -90,36 +111,27 @@ app.post("/api/ingest", async (c) => {
       );
     });
 
-    if (!isAppendMode) {
-      // Halaman 1 (Reset): Bersihkan data lama + masukkan 50 baris pertama secara atomik
+    if (mode === "reset") {
       const deleteStmt = c.env.DB.prepare("DELETE FROM incidents");
       await c.env.DB.batch([deleteStmt, ...insertBatch.slice(0, 50)]);
+      for (let i = 50; i < insertBatch.length; i += 50) {
+        await c.env.DB.batch(insertBatch.slice(i, i + 50));
+      }
+      return c.json({
+        success: true,
+        syncedCount: validRows.length,
+        message: `Sukses Halaman 1! Data lama di-reset & diganti dengan ${validRows.length} tiket terbaru.`,
+      });
     } else {
-      // Halaman 2, 3, dst. (Append): Pertahankan data halaman sebelumnya & tambahkan/perbarui
-      await c.env.DB.batch(insertBatch.slice(0, 50));
+      for (let i = 0; i < insertBatch.length; i += 50) {
+        await c.env.DB.batch(insertBatch.slice(i, i + 50));
+      }
+      return c.json({
+        success: true,
+        syncedCount: validRows.length,
+        message: `Sukses Append! ${validRows.length} tiket tambahan berhasil digabungkan ke database.`,
+      });
     }
-
-    // Jika dalam 1 halaman ada lebih dari 50 baris, masukkan sisanya per 50 baris
-    for (let i = 50; i < insertBatch.length; i += 50) {
-      await c.env.DB.batch(insertBatch.slice(i, i + 50));
-    }
-
-    // Hitung total tiket terkumpul saat ini di database D1
-    const countRow = await c.env.DB.prepare(
-      "SELECT COUNT(*) as total FROM incidents"
-    ).first<{ total: number }>();
-    const totalInDb = countRow?.total ?? validRows.length;
-
-    return c.json({
-      success: true,
-      mode: isAppendMode ? "append" : "reset",
-      page: pageNumber,
-      syncedCount: validRows.length,
-      totalInDb,
-      message: isAppendMode
-        ? `Halaman ${pageNumber} (+${validRows.length} tiket) berhasil ditambahkan! Total terkumpul: ${totalInDb} tiket.`
-        : `Halaman 1 berhasil dimuat (${validRows.length} tiket). Jika ada halaman berikutnya, pindah ke Page 2 lalu jalankan bookmarklet lagi.`,
-    });
   } catch (err: any) {
     return c.json({ error: `Ingest Error: ${err.message}` }, 500);
   }

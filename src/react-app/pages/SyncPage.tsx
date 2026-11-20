@@ -19,9 +19,7 @@ export default function SyncPage({
 
   const apiIngestUrl = `${window.location.origin}/api/ingest`;
 
-  // Bookmarklet mendukung Multi-Page:
-  // OK = Halaman 1 (Reset data lama & isi baru)
-  // Cancel = Halaman 2, 3, dst. (Append / gabungkan ke data sebelumnya tanpa menghapus halaman 1)
+  // Bookmarklet otomatis membaca seluruh header kolom di tabel portal sumber (termasuk DEVICE NAME, RK INFORMATION, URGENCY)
   const bookmarkletCode = `javascript:(async()=>{const t=document.querySelector('table');if(!t)return alert('Tabel tidak ditemukan di halaman ini!');const h=[...t.querySelectorAll('thead th, tr:first-child th')].map(e=>e.innerText.replace(/\\s+/g,' ').trim().toUpperCase());const rows=[...t.querySelectorAll('tbody tr')].map(tr=>{const td=[...tr.querySelectorAll('td')];const o={};h.forEach((k,i)=>{if(k&&td[i])o[k]=td[i].innerText.replace(/\\s+/g,' ').trim()});return o}).filter(r=>r.INCIDENT&&r.INCIDENT.startsWith('INC'));if(!rows.length)return alert('Tidak ada baris tiket INC ditemukan.');const isFirst=confirm('Ditemukan '+rows.length+' tiket di halaman ini.\\n\\n• Klik OK = Kirim sebagai HALAMAN 1 (Hapus data lama & mulai baru)\\n• Klik Cancel = Kirim sebagai HALAMAN 2 / 3 / dst. (Gabungkan ke data sebelumnya)');try{const res=await fetch('${apiIngestUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:isFirst?1:2,mode:isFirst?'reset':'append',rows})});const j=await res.json();alert(j.message||j.error)}catch(e){alert('Gagal mengirim data: '+e.message)}})();`;
 
   const handleCopyBookmarklet = () => {
@@ -37,7 +35,10 @@ export default function SyncPage({
       (item.workzone || "").toLowerCase().includes(q) ||
       (item.witel || "").toLowerCase().includes(q) ||
       (item.status || "").toLowerCase().includes(q) ||
-      (item.service_no || "").toLowerCase().includes(q)
+      (item.service_no || "").toLowerCase().includes(q) ||
+      (item.device_name || "").toLowerCase().includes(q) ||
+      (item.rk_information || "").toLowerCase().includes(q) ||
+      (item.urgency || "").toLowerCase().includes(q)
     );
   });
 
@@ -94,7 +95,7 @@ export default function SyncPage({
           <li>
             Buat atau edit bookmark di Bookmarks Bar Chrome (<code>Ctrl+Shift+B</code> / <code>Cmd+Shift+B</code> → klik kanan → <strong>Edit...</strong> / <strong>Add page...</strong>).
           </li>
-          <li>Tempel kode baru pada kolom <strong>URL</strong>, beri nama <code>Kirim ke Dashboard KPI</code>, lalu simpan.</li>
+          <li>Tempel kode tersebut pada kolom <strong>URL</strong>, beri nama <code>Kirim ke Dashboard KPI</code>, lalu simpan.</li>
           <li>
             Buka <strong>Halaman 1</strong> di portal tiket, klik bookmark lalu pilih <strong>OK (Halaman 1 / Reset)</strong>.
           </li>
@@ -170,14 +171,14 @@ export default function SyncPage({
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <input
               type="text"
-              placeholder="Cari INCIDENT / WORKZONE / SERVICE NO..."
+              placeholder="Cari INCIDENT / DEVICE / RK / URGENCY..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
                 padding: "8px 12px",
                 borderRadius: "6px",
                 border: "1px solid #cbd5e1",
-                width: "280px",
+                width: "290px",
                 fontSize: "12.5px",
               }}
             />
@@ -219,13 +220,16 @@ export default function SyncPage({
                 <th style={thStyle}>CUSTOMER TYPE</th>
                 <th style={thStyle}>CUSTOMER NAME</th>
                 <th style={thStyle}>SERVICE NO</th>
+                <th style={thStyle}>DEVICE NAME</th>
+                <th style={thStyle}>RK INFORMATION</th>
+                <th style={thStyle}>URGENCY</th>
                 <th style={thStyle}>SYMPTOM</th>
               </tr>
             </thead>
             <tbody>
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={15} style={{ padding: "24px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
+                  <td colSpan={18} style={{ padding: "24px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
                     Belum ada data tiket di database. Jalankan Bookmarklet dari portal sumber lalu klik Cek & Refresh Data.
                   </td>
                 </tr>
@@ -246,6 +250,9 @@ export default function SyncPage({
                     <td style={tdStyle}>{row.customer_type || "-"}</td>
                     <td style={tdStyle}>{row.customer_name || "-"}</td>
                     <td style={tdStyle}>{row.service_no || "-"}</td>
+                    <td style={tdStyle}>{row.device_name || "-"}</td>
+                    <td style={tdStyle}>{row.rk_information || "-"}</td>
+                    <td style={tdStyle}>{row.urgency || "-"}</td>
                     <td style={{ ...tdStyle, maxWidth: "240px", overflow: "hidden", textOverflow: "ellipsis" }} title={row.symptom}>
                       {row.symptom || "-"}
                     </td>

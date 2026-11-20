@@ -313,9 +313,15 @@ function classifyStatusManja(bookingDateRaw?: string): ManjaCategory {
   return "MANJA H++";
 }
 
-function normalizeInfraValue(val?: string): string {
+function normalizeDeviceValue(val?: string): string {
   const cleaned = (val || "").trim().toUpperCase();
-  if (!cleaned || cleaned === "-" || cleaned === "NULL" || cleaned === "N/A" || cleaned === "UNKNOWN") {
+  if (
+    !cleaned ||
+    cleaned === "-" ||
+    cleaned === "NULL" ||
+    cleaned === "N/A" ||
+    cleaned === "UNKNOWN"
+  ) {
     return "";
   }
   return cleaned;
@@ -408,10 +414,9 @@ export default function DashboardPage({
     });
   }, []);
 
-  // 1. Pra-Komputasi Seluruh Tiket (Cluster Device/RK Per-STO, TTR, Manja, dan Search Index)
+  // 1. Pra-Komputasi Seluruh Tiket (Cluster DEVICE NAME Per-STO, TTR, Manja, dan Search Index)
   const { enrichedIncidents, topClusters, invalidDateCount } = useMemo(() => {
     const deviceCountMap: Record<string, number> = {};
-    const rkCountMap: Record<string, number> = {};
 
     incidents.forEach((row) => {
       const hasOfficialGamas = Boolean(
@@ -424,16 +429,11 @@ export default function DashboardPage({
       const scope = `${(row.witel || "").toUpperCase().trim()}_${(row.workzone || "")
         .toUpperCase()
         .trim()}`;
-      const dev = normalizeInfraValue(row.device_name);
-      const rk = normalizeInfraValue(row.rk_information);
+      const dev = normalizeDeviceValue(row.device_name);
 
       if (dev) {
         const scopedDev = `${scope}|${dev}`;
         deviceCountMap[scopedDev] = (deviceCountMap[scopedDev] || 0) + 1;
-      }
-      if (rk) {
-        const scopedRk = `${scope}|${rk}`;
-        rkCountMap[scopedRk] = (rkCountMap[scopedRk] || 0) + 1;
       }
     });
 
@@ -463,24 +463,18 @@ export default function DashboardPage({
         const wtUpper = (row.witel || "").toUpperCase().trim();
         const wzUpper = (row.workzone || "").toUpperCase().trim();
         const scope = `${wtUpper}_${wzUpper}`;
-        const dev = normalizeInfraValue(row.device_name);
-        const rk = normalizeInfraValue(row.rk_information);
+        const dev = normalizeDeviceValue(row.device_name);
 
         const devCount = dev ? deviceCountMap[`${scope}|${dev}`] || 0 : 0;
-        const rkCount = rk ? rkCountMap[`${scope}|${rk}`] || 0 : 0;
 
-        if (devCount >= POTENSI_GAMAS_THRESHOLD || rkCount >= POTENSI_GAMAS_THRESHOLD) {
+        if (dev && devCount >= POTENSI_GAMAS_THRESHOLD) {
           gamasCat = "POTENSI_GAMAS";
 
-          const isRkDominant = rkCount >= devCount && rk !== "";
-          const clusterKey = isRkDominant ? `${scope}|RK:${rk}` : `${scope}|DEV:${dev}`;
-          const clusterLabel =
-            dev && rk && dev !== rk ? `${dev} / ${rk}` : isRkDominant ? rk : dev;
-
+          const clusterKey = `${scope}|DEV:${dev}`;
           if (!clusterTracker[clusterKey]) {
             clusterTracker[clusterKey] = {
-              label: clusterLabel,
-              searchKey: isRkDominant ? rk : dev,
+              label: dev,
+              searchKey: dev,
               witel: wtUpper,
               workzone: wzUpper,
               count: 0,
@@ -1633,7 +1627,7 @@ export default function DashboardPage({
                         background: row.potensiGamas > 0 ? "#fef3c7" : undefined,
                         ...formatMatrixZero(row.potensiGamas, "#b45309", true),
                       }}
-                      title={`Filter ${row.workzone} - Potensi Gamas (Cluster Device/RK)`}
+                      title={`Filter ${row.workzone} - Potensi Gamas (Cluster Device Name)`}
                     >
                       {row.potensiGamas}
                     </td>
@@ -2306,7 +2300,7 @@ export default function DashboardPage({
             })}
           </div>
 
-          {/* PANEL DETEKSI CLUSTER DEVICE / RK PER-STO */}
+          {/* PANEL DETEKSI CLUSTER DEVICE NAME PER-STO */}
           <div
             className="kpi-card"
             style={{
@@ -2330,7 +2324,7 @@ export default function DashboardPage({
                 letterSpacing: "0.4px",
               }}
             >
-              <span>POTENSI GAMAS (CLUSTER DEVICE / RK)</span>
+              <span>POTENSI GAMAS (CLUSTER DEVICE NAME)</span>
               <span
                 style={{
                   background: "rgba(255,255,255,0.2)",
@@ -2346,7 +2340,7 @@ export default function DashboardPage({
             <div style={{ padding: "6px 8px" }}>
               {topClusters.length === 0 ? (
                 <div style={{ fontSize: "10.5px", color: "#64748b", textAlign: "center", padding: "6px 4px" }}>
-                  Tidak ada akumulasi ≥ {POTENSI_GAMAS_THRESHOLD} tiket pada 1 Device / RK dalam satu STO.
+                  Tidak ada akumulasi ≥ {POTENSI_GAMAS_THRESHOLD} tiket pada 1 Device Name dalam satu STO.
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -2379,7 +2373,7 @@ export default function DashboardPage({
                           gap: "6px",
                           cursor: "pointer",
                         }}
-                        title="Klik untuk memfilter tiket pada cluster perangkat ini"
+                        title="Klik untuk memfilter tiket pada cluster device ini"
                       >
                         <div style={{ minWidth: 0 }}>
                           <div
@@ -2512,7 +2506,7 @@ export default function DashboardPage({
             >
               <option value="ALL">Semua Status Gamas</option>
               <option value="GAMAS">Tiket Gamas (ID Resmi)</option>
-              <option value="POTENSI_GAMAS">Potensi Gamas (Cluster)</option>
+              <option value="POTENSI_GAMAS">Potensi Gamas (Device Name)</option>
               <option value="NON_GAMAS">Non-Gamas</option>
             </select>
 

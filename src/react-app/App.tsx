@@ -175,7 +175,7 @@ export default function App() {
               transition: "all 0.15s ease",
             }}
           >
-            Report Tiket ({incidents.length})
+            Dashboard KPI ({incidents.length})
           </button>
 
           <button
@@ -256,6 +256,7 @@ export default function App() {
             csvFilePrefix="Laporan_Gangguan"
             accentGradient="linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)"
             accentColor="#1e3a8a"
+            showManjaAndTtr={true}
           />
         )}
 
@@ -270,6 +271,7 @@ export default function App() {
             csvFilePrefix="Laporan_Unspec_Insera"
             accentGradient="linear-gradient(135deg, #115e59 0%, #0d9488 100%)"
             accentColor="#0f766e"
+            showManjaAndTtr={false}
           />
         )}
 

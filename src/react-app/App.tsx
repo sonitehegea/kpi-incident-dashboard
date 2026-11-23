@@ -175,7 +175,7 @@ export default function App() {
               transition: "all 0.15s ease",
             }}
           >
-            Dashboard KPI ({incidents.length})
+            Report Tiket Ggn IH ({incidents.length})
           </button>
 
           <button
@@ -266,7 +266,7 @@ export default function App() {
             loading={loading}
             onRefresh={loadAllData}
             lastSyncWib={lastSyncUnspecWib}
-            dashboardTitle="Monitoring Unspec Insera Controller – Branch Northern Jakarta"
+            dashboardTitle="Monitoring Unspec Insera – Branch Northern Jakarta"
             waReportHeader="MONITORING UNSPEC INSERA CONTROLLER NORTHERNJAKARTA"
             csvFilePrefix="Laporan_Unspec_Insera"
             accentGradient="linear-gradient(135deg, #115e59 0%, #0d9488 100%)"

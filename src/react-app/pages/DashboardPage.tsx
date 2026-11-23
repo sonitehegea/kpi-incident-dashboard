@@ -2195,4 +2195,1356 @@ export default function DashboardPage({
       <div
         style={{
           maxHeight: showManjaAndTtr ? "175px" : "225px",
-          overflowY:
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {items.length === 0 ? (
+          <div
+            style={{
+              padding: "10px 6px",
+              fontSize: "9.5px",
+              color: "#94a3b8",
+              textAlign: "center",
+            }}
+          >
+            {emptyText}
+          </div>
+        ) : (
+          items.map((cl, idx) => {
+            const isClusterFiltered = activeClusterFilter?.id === cl.id;
+            const isLast = idx === items.length - 1;
+            return (
+              <div
+                key={cl.id}
+                onClick={() => {
+                  if (isClusterFiltered) {
+                    setActiveClusterFilter(null);
+                    setFilterWorkzone("ALL");
+                    setFilterGamas("ALL");
+                  } else {
+                    setActiveClusterFilter({
+                      id: cl.id,
+                      type: cl.type,
+                      rawName: cl.rawName,
+                      workzone: cl.workzone,
+                    });
+                    setFilterWorkzone(cl.workzone);
+                    setFilterGamas("POTENSI_GAMAS");
+                  }
+                }}
+                style={{
+                  padding: "4px 6px",
+                  borderBottom: isLast ? "none" : "1px solid #fef3c7",
+                  background: isClusterFiltered ? "#fde68a" : "#fffbeb",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+                title={`${cl.label} (${cl.witel} • ${cl.workzone}) - ${cl.count} Tiket. Klik untuk filter tabel detail.`}
+              >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: "9.5px",
+                      fontWeight: 800,
+                      color: "#92400e",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {cl.label}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "8.5px",
+                      color: "#b45309",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {cl.witel} • {cl.workzone}
+                  </div>
+                </div>
+                <span
+                  style={{
+                    background: isClusterFiltered ? "#92400e" : badgeBg,
+                    color: "#ffffff",
+                    fontSize: "9px",
+                    fontWeight: 800,
+                    padding: "1px 5px",
+                    borderRadius: "4px",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {cl.count}
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  const thStyle: React.CSSProperties = {
+    padding: "6px 10px",
+    whiteSpace: "nowrap",
+    fontWeight: 700,
+    fontSize: "10.5px",
+    color: "#334155",
+    borderBottom: "2px solid #cbd5e1",
+    textTransform: "uppercase",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: "5.5px 10px",
+    whiteSpace: "nowrap",
+    fontSize: "11.5px",
+    color: "#334155",
+  };
+
+  const hasAnyCluster = rkClusters.length > 0 || devClusters.length > 0;
+  const detailColSpan = showManjaAndTtr ? 21 : 18;
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "1320px",
+        margin: "0 auto",
+        padding: "8px 12px",
+      }}
+    >
+      {/* HEADER BAR EXECUTIVE FORMAL */}
+      <div
+        style={{
+          background: "#ffffff",
+          border: "1px solid #cbd5e1",
+          borderRadius: "8px",
+          padding: "8px 14px",
+          marginBottom: "8px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "8px",
+          boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "16.5px",
+              fontWeight: 800,
+              color: "#0f172a",
+              letterSpacing: "-0.2px",
+            }}
+          >
+            {dashboardTitle} – {todayTitle}
+          </h1>
+          <div
+            style={{
+              fontSize: "11.5px",
+              color: "#64748b",
+              marginTop: "2px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
+            <span>
+              Last Sync DB:{" "}
+              <strong
+                style={{
+                  color: isDataStale ? "#b45309" : "#0f172a",
+                  background: isDataStale ? "#fef3c7" : "transparent",
+                  padding: isDataStale ? "1px 6px" : "0",
+                  borderRadius: "4px",
+                }}
+              >
+                {lastSyncWib}
+              </strong>
+            </span>
+            <span>•</span>
+            <span>
+              Total Sumber Data:{" "}
+              <strong style={{ color: accentColor }}>
+                {incidents.length} Tiket
+              </strong>
+            </span>
+            {showManjaAndTtr && invalidDateCount > 0 && (
+              <span
+                style={{
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  padding: "0.5px 6px",
+                  borderRadius: "4px",
+                  fontSize: "10.5px",
+                  fontWeight: 700,
+                }}
+              >
+                {invalidDateCount} tgl invalid
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={handleCopyWaReport}
+            style={{
+              background: waCopied ? "#15803d" : "#ecfdf5",
+              color: waCopied ? "#ffffff" : "#047857",
+              border: "1px solid #a7f3d0",
+              padding: "5px 12px",
+              borderRadius: "6px",
+              fontSize: "11.5px",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            {waCopied ? "Tersalin ke Clipboard!" : "Copy Laporan WA"}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            style={{
+              background: "#f8fafc",
+              color: "#334155",
+              border: "1px solid #cbd5e1",
+              padding: "5px 12px",
+              borderRadius: "6px",
+              fontSize: "11.5px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Export CSV ({filteredData.length})
+          </button>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            style={{
+              background: accentColor,
+              color: "#fff",
+              border: `1px solid ${accentColor}`,
+              padding: "5px 14px",
+              borderRadius: "6px",
+              fontSize: "11.5px",
+              fontWeight: 600,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            {loading ? "Memuat..." : "Refresh Data"}
+          </button>
+        </div>
+      </div>
+
+      {/* ASYMMETRIC SPLIT LAYOUT */}
+      <div className="exec-split-layout" style={{ marginBottom: "10px" }}>
+        <div className="exec-left-kpi-col">
+          {/* HERO CARD: TOTAL TIKET AKTIF */}
+          <div
+            className="kpi-card"
+            style={{
+              background: "#ffffff",
+              borderRadius: "8px",
+              border: "1px solid #cbd5e1",
+              overflow: "hidden",
+              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+            }}
+          >
+            <div
+              style={{
+                background: "#1e293b",
+                padding: "4.5px 10px",
+                textAlign: "center",
+                fontWeight: 700,
+                fontSize: "9.5px",
+                color: "#f8fafc",
+                letterSpacing: "0.5px",
+              }}
+            >
+              TOTAL TIKET AKTIF
+            </div>
+
+            <div
+              style={{
+                padding: "10px 12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+              }}
+            >
+              <svg
+                width="96"
+                height="96"
+                viewBox="0 0 88 88"
+                style={{ flexShrink: 0 }}
+              >
+                <circle
+                  cx="44"
+                  cy="44"
+                  r={radius}
+                  fill="transparent"
+                  stroke="#e2e8f0"
+                  strokeWidth="9"
+                />
+                {globalStats.total > 0 && (
+                  <>
+                    <circle
+                      cx="44"
+                      cy="44"
+                      r={radius}
+                      fill="transparent"
+                      stroke="#0d9488"
+                      strokeWidth="9"
+                      strokeDasharray={`${jakutStroke} ${circumference}`}
+                      transform="rotate(-90 44 44)"
+                    />
+                    <circle
+                      cx="44"
+                      cy="44"
+                      r={radius}
+                      fill="transparent"
+                      stroke="#1e3a8a"
+                      strokeWidth="9"
+                      strokeDasharray={`${jakbarStroke} ${circumference}`}
+                      strokeDashoffset={-jakutStroke}
+                      transform="rotate(-90 44 44)"
+                    />
+                  </>
+                )}
+                <text
+                  x="44"
+                  y="42"
+                  textAnchor="middle"
+                  fill="#0f172a"
+                  fontSize="19"
+                  fontWeight="800"
+                >
+                  {globalStats.total}
+                </text>
+                <text
+                  x="44"
+                  y="54"
+                  textAnchor="middle"
+                  fill="#64748b"
+                  fontSize="6.8"
+                  fontWeight="700"
+                >
+                  OPEN TIKET
+                </text>
+              </svg>
+
+              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                <div
+                  className="exec-metric-row"
+                  onClick={() =>
+                    setFilterWitel(filterWitel === "JAKBAR" ? "ALL" : "JAKBAR")
+                  }
+                  style={{
+                    background:
+                      filterWitel === "JAKBAR" ? "#eff6ff" : "transparent",
+                    borderBottom: "1px solid #e2e8f0",
+                    padding: "6px 4px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      color: "#1e293b",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "2px",
+                        background: "#1e3a8a",
+                        display: "inline-block",
+                      }}
+                    />
+                    Witel JAKBAR
+                  </span>
+                  <span
+                    style={{
+                      color: "#0f172a",
+                      fontWeight: 800,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {globalStats.jakbarCount}{" "}
+                    <span
+                      style={{
+                        color: "#64748b",
+                        fontWeight: 600,
+                        fontSize: "10px",
+                      }}
+                    >
+                      ({globalStats.jakbarSharePct}%)
+                    </span>
+                  </span>
+                </div>
+
+                <div
+                  className="exec-metric-row"
+                  onClick={() =>
+                    setFilterWitel(filterWitel === "JAKUT" ? "ALL" : "JAKUT")
+                  }
+                  style={{
+                    background:
+                      filterWitel === "JAKUT" ? "#f0fdfa" : "transparent",
+                    padding: "6px 4px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      color: "#1e293b",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "2px",
+                        background: "#0d9488",
+                        display: "inline-block",
+                      }}
+                    />
+                    Witel JAKUT
+                  </span>
+                  <span
+                    style={{
+                      color: "#0f172a",
+                      fontWeight: 800,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {globalStats.jakutCount}{" "}
+                    <span
+                      style={{
+                        color: "#64748b",
+                        fontWeight: 600,
+                        fontSize: "10px",
+                      }}
+                    >
+                      ({globalStats.jakutSharePct}%)
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* KARTU KPI MINI (6 Kartu untuk Utama, 4 Kartu untuk Unspec) */}
+          <div className="exec-mini-kpi-grid">
+            {renderSidebarKpiCard({
+              title: "INDIKASI GAMAS",
+              bigValue: (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "5px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 800,
+                      color:
+                        globalStats.gamasTotal > 0 ? "#b91c1c" : "#0f172a",
+                    }}
+                  >
+                    {globalStats.gamasTotal}
+                  </span>
+                  <span style={{ color: "#cbd5e1", fontSize: "13px" }}>|</span>
+                  <span
+                    style={{
+                      fontSize: "11.5px",
+                      fontWeight: 800,
+                      color:
+                        globalStats.potensiGamasTotal > 0
+                          ? "#b45309"
+                          : "#64748b",
+                    }}
+                  >
+                    Potensi: {globalStats.potensiGamasTotal}
+                  </span>
+                </div>
+              ),
+              bigValueFontSize: "15px",
+              rowHighlightMap: {
+                "Tiket Gamas": {
+                  labelColor: "#b91c1c",
+                  valueColor: "#b91c1c",
+                  alertBg: "#fef2f2",
+                },
+                "Potensi Gamas": {
+                  labelColor: "#b45309",
+                  valueColor: "#b45309",
+                  alertBg: "#fffbeb",
+                },
+              },
+              activeFilterValue:
+                filterGamas === "GAMAS"
+                  ? "Tiket Gamas"
+                  : filterGamas === "POTENSI_GAMAS"
+                  ? "Potensi Gamas"
+                  : filterGamas === "NON_GAMAS"
+                  ? "Non-Gamas"
+                  : undefined,
+              rows: globalStats.gamasRows,
+              onRowClick: (label) => {
+                setActiveClusterFilter(null);
+                if (label === "Tiket Gamas") {
+                  setFilterGamas(filterGamas === "GAMAS" ? "ALL" : "GAMAS");
+                } else if (label === "Potensi Gamas") {
+                  setFilterGamas(
+                    filterGamas === "POTENSI_GAMAS" ? "ALL" : "POTENSI_GAMAS"
+                  );
+                } else {
+                  setFilterGamas(
+                    filterGamas === "NON_GAMAS" ? "ALL" : "NON_GAMAS"
+                  );
+                }
+              },
+            })}
+
+            {renderSidebarKpiCard({
+              title: "SEGMEN PELANGGAN",
+              bigValue: (
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    color: "#0f172a",
+                  }}
+                >
+                  HVC: {globalStats.hvcTotal} ({globalStats.hvcSharePct}%) |
+                  REG: {globalStats.regTotal}
+                </span>
+              ),
+              bigValueFontSize: "11px",
+              activeFilterValue:
+                filterCustType !== "ALL" ? filterCustType : undefined,
+              rows: globalStats.segmenRows,
+              onRowClick: (label) => {
+                setFilterCustType(filterCustType === label ? "ALL" : label);
+              },
+            })}
+
+            {renderSidebarKpiCard({
+              title: "STATUS TIKET",
+              bigValue: globalStats.total,
+              bigValueColor: accentColor,
+              activeFilterValue:
+                filterStatus !== "ALL" ? filterStatus : undefined,
+              rows: globalStats.statusRows,
+              onRowClick: (label) => {
+                setFilterStatus(filterStatus === label ? "ALL" : label);
+              },
+            })}
+
+            {renderSidebarKpiCard({
+              title: "SERVICE TYPE",
+              bigValue: globalStats.total,
+              bigValueColor: "#0f172a",
+              rows: globalStats.serviceRows,
+            })}
+
+            {showManjaAndTtr &&
+              renderSidebarKpiCard({
+                title: "STATUS MANJA",
+                bigValue: globalStats.total,
+                bigValueColor: "#0f172a",
+                rowHighlightMap: {
+                  "MANJA EXPIRED": {
+                    labelColor: "#b91c1c",
+                    valueColor: "#b91c1c",
+                    alertBg: "#fef2f2",
+                  },
+                },
+                activeFilterValue:
+                  filterManja !== "ALL" ? filterManja : undefined,
+                rows: globalStats.manjaRows,
+                onRowClick: (label) => {
+                  setFilterManja(filterManja === label ? "ALL" : label);
+                },
+              })}
+
+            {showManjaAndTtr &&
+              renderSidebarKpiCard({
+                title: "STATUS TTR (SLA)",
+                bigValue: (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 800,
+                        color: "#0f172a",
+                      }}
+                    >
+                      {globalStats.inSlaRatePct}%{" "}
+                      <span
+                        style={{
+                          fontSize: "9.5px",
+                          fontWeight: 700,
+                          color: "#0d9488",
+                        }}
+                      >
+                        SLA
+                      </span>
+                    </span>
+                    {globalStats.ttrExpiredTotal > 0 && (
+                      <span
+                        style={{
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          border: "1px solid #fecaca",
+                          fontSize: "9px",
+                          fontWeight: 800,
+                          padding: "0.5px 4px",
+                          borderRadius: "3px",
+                        }}
+                      >
+                        {globalStats.ttrExpiredTotal} Exp
+                      </span>
+                    )}
+                  </div>
+                ),
+                bigValueFontSize: "14px",
+                rowHighlightMap: {
+                  "SLA Kritis": {
+                    labelColor: "#b45309",
+                    valueColor: "#b45309",
+                    alertBg: "#fffbeb",
+                  },
+                  "TTR Expired": {
+                    labelColor: "#b91c1c",
+                    valueColor: "#b91c1c",
+                    alertBg: "#fef2f2",
+                  },
+                },
+                activeFilterValue: filterTtr !== "ALL" ? filterTtr : undefined,
+                rows: globalStats.ttrRows,
+                onRowClick: (label) => {
+                  setFilterTtr(filterTtr === label ? "ALL" : label);
+                },
+              })}
+          </div>
+
+          {/* PANEL DETEKSI CLUSTER SPLIT 2 KOLOM */}
+          <div
+            className="kpi-card"
+            style={{
+              background: "#ffffff",
+              borderRadius: "8px",
+              border: hasAnyCluster ? "1px solid #fcd34d" : "1px solid #cbd5e1",
+              overflow: "hidden",
+              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+            }}
+          >
+            <div
+              style={{
+                background: hasAnyCluster ? "#92400e" : "#1e293b",
+                padding: "4.5px 10px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontWeight: 700,
+                fontSize: "9.5px",
+                color: "#ffffff",
+                letterSpacing: "0.4px",
+              }}
+            >
+              <span>POTENSI GAMAS (CLUSTER)</span>
+              <span
+                style={{
+                  background: "rgba(255,255,255,0.2)",
+                  padding: "0.5px 6px",
+                  borderRadius: "99px",
+                  fontSize: "8.5px",
+                }}
+              >
+                RK ≥ {POTENSI_RK_THRESHOLD} | DEV ≥ {POTENSI_DEVICE_THRESHOLD}
+              </span>
+            </div>
+
+            <div style={{ padding: "6px" }}>
+              {!hasAnyCluster ? (
+                <div
+                  style={{
+                    fontSize: "10.5px",
+                    color: "#64748b",
+                    textAlign: "center",
+                    padding: "6px 4px",
+                  }}
+                >
+                  Tidak ada akumulasi RK ≥ {POTENSI_RK_THRESHOLD} atau DEV ≥{" "}
+                  {POTENSI_DEVICE_THRESHOLD} dalam satu STO.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "6px",
+                    alignItems: "start",
+                  }}
+                >
+                  {renderSplitClusterColumn(
+                    `BY RK (≥ ${POTENSI_RK_THRESHOLD})`,
+                    rkClusters,
+                    `Nihil RK ≥ ${POTENSI_RK_THRESHOLD}`,
+                    "#b45309"
+                  )}
+                  {renderSplitClusterColumn(
+                    `BY DEVICE (≥ ${POTENSI_DEVICE_THRESHOLD})`,
+                    devClusters,
+                    `Nihil DEV ≥ ${POTENSI_DEVICE_THRESHOLD}`,
+                    "#d97706"
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* KOLOM KANAN: TABEL MATRIKS JAKUT & JAKBAR */}
+        <div className="exec-right-tables-col">
+          {renderMatrixCard("JAKUT", "JAKUT", jakutMatrix)}
+          {renderMatrixCard("JAKBAR", "JAKBAR", jakbarMatrix)}
+        </div>
+      </div>
+
+      {/* TABEL DETAIL */}
+      <div
+        style={{
+          background: "#ffffff",
+          padding: "10px 12px",
+          borderRadius: "8px",
+          border: "1px solid #cbd5e1",
+          boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "6px",
+            marginBottom: "8px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: "5px",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: "12px",
+                color: "#0f172a",
+                marginRight: "4px",
+              }}
+            >
+              DETAIL TIKET ({filteredData.length})
+            </span>
+
+            {activeClusterFilter && (
+              <span
+                style={{
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  border: "1px solid #fcd34d",
+                  padding: "3px 8px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                }}
+              >
+                Cluster {activeClusterFilter.type === "RK" ? "RK" : "Device"}:{" "}
+                {activeClusterFilter.rawName}
+              </span>
+            )}
+
+            <select
+              value={filterWitel}
+              onChange={(e) => setFilterWitel(e.target.value)}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
+            >
+              <option value="ALL">Semua Witel</option>
+              {filterOptions.witels.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterWorkzone}
+              onChange={(e) => {
+                setActiveClusterFilter(null);
+                setFilterWorkzone(e.target.value);
+              }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
+            >
+              <option value="ALL">Semua Workzone</option>
+              {filterOptions.workzones.map((wz) => (
+                <option key={wz} value={wz}>
+                  {wz}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
+            >
+              <option value="ALL">Semua Status</option>
+              {filterOptions.statuses.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterCustType}
+              onChange={(e) => setFilterCustType(e.target.value)}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
+            >
+              <option value="ALL">Semua Segmen</option>
+              {filterOptions.custTypes.map((ct) => (
+                <option key={ct} value={ct}>
+                  {ct}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterGamas}
+              onChange={(e) => {
+                setActiveClusterFilter(null);
+                setFilterGamas(e.target.value);
+              }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
+            >
+              <option value="ALL">Semua Status Gamas</option>
+              <option value="GAMAS">Tiket Gamas (ID Resmi)</option>
+              <option value="POTENSI_GAMAS">
+                Potensi Gamas (DEV ≥ 2 / RK ≥ 3)
+              </option>
+              <option value="NON_GAMAS">Non-Gamas</option>
+            </select>
+
+            {showManjaAndTtr && (
+              <>
+                <select
+                  value={filterManja}
+                  onChange={(e) => setFilterManja(e.target.value)}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "11.5px",
+                    background: "#fff",
+                  }}
+                >
+                  <option value="ALL">Semua Status Manja</option>
+                  <option value="ANY_MANJA">Semua Manja (Booking)</option>
+                  {CARD_MANJA_ORDER.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={filterTtr}
+                  onChange={(e) => setFilterTtr(e.target.value)}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "11.5px",
+                    background: "#fff",
+                  }}
+                >
+                  <option value="ALL">Semua Status TTR</option>
+                  {CARD_TTR_ORDER.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            <select
+              value={filterUrgency}
+              onChange={(e) => setFilterUrgency(e.target.value)}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
+            >
+              <option value="ALL">Semua Urgency</option>
+              {filterOptions.urgencies.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+
+            {hasActiveFilter && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                style={{
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  border: "1px solid #fecaca",
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  fontSize: "11.5px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Reset Filter
+              </button>
+            )}
+          </div>
+
+          <input
+            type="text"
+            placeholder="Cari INCIDENT / DEVICE / RK / URGENCY..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              padding: "4px 10px",
+              borderRadius: "6px",
+              border: "1px solid #cbd5e1",
+              width: "245px",
+              fontSize: "11.5px",
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            overflowX: "auto",
+            border: "1px solid #cbd5e1",
+            borderRadius: "6px",
+            maxHeight: "56vh",
+          }}
+        >
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              textAlign: "left",
+            }}
+          >
+            <thead
+              style={{
+                background: "#f8fafc",
+                position: "sticky",
+                top: 0,
+                zIndex: 1,
+              }}
+            >
+              <tr>
+                <th style={thStyle}>INCIDENT</th>
+                <th style={thStyle}>REPORTED DATE</th>
+                {showManjaAndTtr && (
+                  <>
+                    <th style={thStyle}>STATUS TTR</th>
+                    <th style={thStyle}>BOOKING DATE</th>
+                    <th style={thStyle}>STATUS MANJA</th>
+                  </>
+                )}
+                <th style={thStyle}>KATEGORI GAMAS</th>
+                <th style={thStyle}>SERVICE TYPE</th>
+                <th style={thStyle}>WITEL</th>
+                <th style={thStyle}>WORKZONE</th>
+                <th style={thStyle}>STATUS</th>
+                <th style={thStyle}>STATUS DATE</th>
+                <th style={thStyle}>TICKET ID GAMAS</th>
+                <th style={thStyle}>CONTACT PHONE</th>
+                <th style={thStyle}>CONTACT NAME</th>
+                <th style={thStyle}>CUSTOMER TYPE</th>
+                <th style={thStyle}>CUSTOMER NAME</th>
+                <th style={thStyle}>SERVICE NO</th>
+                <th style={thStyle}>DEVICE NAME</th>
+                <th style={thStyle}>RK INFORMATION</th>
+                <th style={thStyle}>URGENCY</th>
+                <th style={thStyle}>SYMPTOM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayedRows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={detailColSpan}
+                    style={{
+                      padding: "20px",
+                      textAlign: "center",
+                      color: "#64748b",
+                      fontSize: "12.5px",
+                    }}
+                  >
+                    Tidak ada data tiket yang sesuai dengan filter saat ini.
+                  </td>
+                </tr>
+              ) : (
+                displayedRows.map((row) => {
+                  const manjaLabel = row._manja;
+                  const manjaBadgeStyle: React.CSSProperties =
+                    manjaLabel === "MANJA HI"
+                      ? { background: "#dcfce7", color: "#15803d" }
+                      : manjaLabel === "MANJA H+"
+                      ? { background: "#cffafe", color: "#0e7490" }
+                      : manjaLabel === "MANJA H++"
+                      ? { background: "#dbeafe", color: "#1d4ed8" }
+                      : manjaLabel === "MANJA EXPIRED"
+                      ? { background: "#fee2e2", color: "#b91c1c" }
+                      : { background: "#f1f5f9", color: "#475569" };
+
+                  const ttrEval = row._ttr;
+                  const ttrBadgeStyle: React.CSSProperties =
+                    ttrEval.status === "TTR Expired"
+                      ? {
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          border: "1px solid #fecaca",
+                        }
+                      : ttrEval.status === "SLA Kritis"
+                      ? {
+                          background: "#fef3c7",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                        }
+                      : {
+                          background: "#dcfce7",
+                          color: "#15803d",
+                          border: "1px solid #bbf7d0",
+                        };
+
+                  const gCat = row._gamasCat;
+                  const gamasBadgeStyle: React.CSSProperties =
+                    gCat === "GAMAS"
+                      ? {
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          border: "1px solid #fecaca",
+                        }
+                      : gCat === "POTENSI_GAMAS"
+                      ? {
+                          background: "#fef3c7",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                        }
+                      : { background: "#f1f5f9", color: "#475569" };
+                  const gamasBadgeLabel =
+                    gCat === "GAMAS"
+                      ? "GAMAS"
+                      : gCat === "POTENSI_GAMAS"
+                      ? "POTENSI GAMAS"
+                      : "NON GAMAS";
+
+                  const urgUpper = (row.urgency || "").toUpperCase();
+                  const isHighUrgency =
+                    urgUpper.includes("HIGH") ||
+                    urgUpper.includes("CRITICAL") ||
+                    urgUpper.includes("VVIP") ||
+                    urgUpper === "1";
+
+                  return (
+                    <tr
+                      key={row.incident}
+                      className="detail-row"
+                      style={{ borderBottom: "1px solid #e2e8f0" }}
+                    >
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontWeight: 700,
+                          color: accentColor,
+                        }}
+                      >
+                        {row.incident}
+                      </td>
+                      <td style={tdStyle}>{row.reported_date || "-"}</td>
+                      {showManjaAndTtr && (
+                        <>
+                          <td style={tdStyle}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "5px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  ...ttrBadgeStyle,
+                                  padding: "1.5px 7px",
+                                  borderRadius: "4px",
+                                  fontSize: "10.5px",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {ttrEval.status}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "10.5px",
+                                  color: "#64748b",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ({ttrEval.elapsedText})
+                              </span>
+                            </div>
+                          </td>
+                          <td style={tdStyle}>{row.booking_date || "-"}</td>
+                          <td style={tdStyle}>
+                            <span
+                              style={{
+                                ...manjaBadgeStyle,
+                                padding: "1.5px 7px",
+                                borderRadius: "4px",
+                                fontSize: "10.5px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {manjaLabel}
+                            </span>
+                          </td>
+                        </>
+                      )}
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            ...gamasBadgeStyle,
+                            padding: "1.5px 7px",
+                            borderRadius: "4px",
+                            fontSize: "10.5px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {gamasBadgeLabel}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>{row.service_type || "-"}</td>
+                      <td style={tdStyle}>{row.witel || "-"}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        {row.workzone || "-"}
+                      </td>
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            padding: "1.5px 7px",
+                            borderRadius: "4px",
+                            fontSize: "10.5px",
+                            fontWeight: 700,
+                            background:
+                              row.status === "BACKEND"
+                                ? "#dbeafe"
+                                : row.status === "DRAFT"
+                                ? "#fef3c7"
+                                : "#f1f5f9",
+                            color:
+                              row.status === "BACKEND"
+                                ? "#1e40af"
+                                : row.status === "DRAFT"
+                                ? "#92400e"
+                                : "#334155",
+                          }}
+                        >
+                          {row.status || "-"}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>{row.status_date || "-"}</td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          color:
+                            row.ticket_id_gamas && row.ticket_id_gamas !== "-"
+                              ? "#dc2626"
+                              : "#64748b",
+                          fontWeight:
+                            row.ticket_id_gamas && row.ticket_id_gamas !== "-"
+                              ? 700
+                              : 400,
+                        }}
+                      >
+                        {row.ticket_id_gamas || "-"}
+                      </td>
+                      <td style={tdStyle}>{row.contact_phone || "-"}</td>
+                      <td style={tdStyle}>{row.contact_name || "-"}</td>
+                      <td style={tdStyle}>{row.customer_type || "-"}</td>
+                      <td style={tdStyle}>{row.customer_name || "-"}</td>
+                      <td style={tdStyle}>{row.service_no || "-"}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        {row.device_name || "-"}
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        {row.rk_information || "-"}
+                      </td>
+                      <td style={tdStyle}>
+                        {row.urgency && row.urgency !== "-" ? (
+                          <span
+                            style={{
+                              padding: "1.5px 7px",
+                              borderRadius: "4px",
+                              fontSize: "10.5px",
+                              fontWeight: 700,
+                              background: isHighUrgency ? "#fee2e2" : "#f1f5f9",
+                              color: isHighUrgency ? "#b91c1c" : "#334155",
+                            }}
+                          >
+                            {row.urgency}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          maxWidth: "240px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                        title={row.symptom}
+                      >
+                        {row.symptom || "-"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredData.length > 50 && (
+          <div
+            style={{
+              marginTop: "8px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontSize: "11.5px",
+              color: "#64748b",
+            }}
+          >
+            <span>
+              Menampilkan <strong>{displayedRows.length}</strong> dari{" "}
+              <strong>{filteredData.length}</strong> tiket
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAllRows((prev) => !prev)}
+              style={{
+                background: "#f1f5f9",
+                color: accentColor,
+                border: "1px solid #cbd5e1",
+                padding: "4px 12px",
+                borderRadius: "6px",
+                fontSize: "11.5px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {showAllRows
+                ? "Ringkas (50 Baris Pertama)"
+                : `Tampilkan Semua (${filteredData.length} Baris)`}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

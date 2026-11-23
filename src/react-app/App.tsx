@@ -175,7 +175,7 @@ export default function App() {
               transition: "all 0.15s ease",
             }}
           >
-            Dashboard KPI ({incidents.length})
+            Report Tiket ({incidents.length})
           </button>
 
           <button

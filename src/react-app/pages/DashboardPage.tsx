@@ -7,6 +7,11 @@ interface DashboardPageProps {
   onRefresh: () => Promise<void>;
   lastSyncWib: string;
   isDataStale?: boolean;
+  dashboardTitle?: string;
+  waReportHeader?: string;
+  csvFilePrefix?: string;
+  accentGradient?: string;
+  accentColor?: string;
 }
 
 const BAKU_WZ_JAKUT = [
@@ -155,8 +160,10 @@ function normalizeHour24(hhStr: string, ampm?: string): string {
   return String(hh).padStart(2, "0");
 }
 
-// Parser Tanggal Multi-Format (ISO, DD-MM-YYYY, DD-MMM-YYYY, Indo/Eng, AM/PM)
-function parseWibTimestamp(rawStr?: string, defaultTime = "00:00:00"): Date | null {
+function parseWibTimestamp(
+  rawStr?: string,
+  defaultTime = "00:00:00"
+): Date | null {
   const raw = (rawStr || "").trim();
   if (!raw || raw === "-" || raw.toLowerCase() === "null") {
     return null;
@@ -164,7 +171,6 @@ function parseWibTimestamp(rawStr?: string, defaultTime = "00:00:00"): Date | nu
 
   const [defH, defM, defS] = defaultTime.split(":");
 
-  // 1. Format YYYY-MM-DD atau YYYY/MM/DD
   const isoMatch = raw.match(
     /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?)?/i
   );
@@ -180,7 +186,6 @@ function parseWibTimestamp(rawStr?: string, defaultTime = "00:00:00"): Date | nu
     return isNaN(dt.getTime()) ? null : dt;
   }
 
-  // 2. Format DD-MM-YYYY atau DD/MM/YYYY
   const dmyMatch = raw.match(
     /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?)?/i
   );
@@ -196,12 +201,12 @@ function parseWibTimestamp(rawStr?: string, defaultTime = "00:00:00"): Date | nu
     return isNaN(dt.getTime()) ? null : dt;
   }
 
-  // 3. Format DD-MMM-YYYY atau DD MMM YYYY (contoh: 20-Nov-2026 14:30:00)
   const textMonthMatch = raw.match(
     /^(\d{1,2})[-/\s]([A-Za-z]+)[-/\s](\d{4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?)?/i
   );
   if (textMonthMatch) {
-    const [, d, mText, y, hh = defH, mm = defM, ss = defS, ampm] = textMonthMatch;
+    const [, d, mText, y, hh = defH, mm = defM, ss = defS, ampm] =
+      textMonthMatch;
     const mNum = MONTH_NAME_MAP[mText.toUpperCase()];
     if (mNum) {
       const hour24 = normalizeHour24(hh, ampm);
@@ -227,7 +232,10 @@ function getSlaTargetHours(customerType?: string): number {
   return 24;
 }
 
-function evaluateTtr(reportedDateRaw?: string, customerType?: string): TtrEvaluation {
+function evaluateTtr(
+  reportedDateRaw?: string,
+  customerType?: string
+): TtrEvaluation {
   const targetHours = getSlaTargetHours(customerType);
   const reportedDt = parseWibTimestamp(reportedDateRaw, "00:00:00");
 
@@ -357,6 +365,11 @@ export default function DashboardPage({
   onRefresh,
   lastSyncWib,
   isDataStale = false,
+  dashboardTitle = "Monitoring Gangguan Branch Northern Jakarta",
+  waReportHeader = "MONITORING TIKET OPEN NORTHERNJAKARTA",
+  csvFilePrefix = "Laporan_Gangguan",
+  accentGradient = "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)",
+  accentColor = "#1e3a8a",
 }: DashboardPageProps) {
   const [search, setSearch] = useState("");
   const [filterWitel, setFilterWitel] = useState("ALL");
@@ -376,7 +389,6 @@ export default function DashboardPage({
   const [waCopied, setWaCopied] = useState(false);
   const [showAllRows, setShowAllRows] = useState(false);
 
-  // Reset pagination ketika filter atau pencarian berubah
   useEffect(() => {
     setShowAllRows(false);
   }, [
@@ -426,142 +438,148 @@ export default function DashboardPage({
     });
   }, []);
 
-  // 1. Pra-Komputasi Seluruh Tiket (Cluster DEVICE >= 2 & RK >= 3 Per-STO, otomatis sort)
-  const { enrichedIncidents, rkClusters, devClusters, invalidDateCount } = useMemo(() => {
-    const deviceCountMap: Record<string, number> = {};
-    const rkCountMap: Record<string, number> = {};
+  const { enrichedIncidents, rkClusters, devClusters, invalidDateCount } =
+    useMemo(() => {
+      const deviceCountMap: Record<string, number> = {};
+      const rkCountMap: Record<string, number> = {};
 
-    incidents.forEach((row) => {
-      const hasOfficialGamas = Boolean(
-        row.ticket_id_gamas &&
-          row.ticket_id_gamas.trim() !== "" &&
-          row.ticket_id_gamas !== "-"
-      );
-      if (hasOfficialGamas) return;
+      incidents.forEach((row) => {
+        const hasOfficialGamas = Boolean(
+          row.ticket_id_gamas &&
+            row.ticket_id_gamas.trim() !== "" &&
+            row.ticket_id_gamas !== "-"
+        );
+        if (hasOfficialGamas) return;
 
-      const scope = `${(row.witel || "").toUpperCase().trim()}_${(row.workzone || "")
-        .toUpperCase()
-        .trim()}`;
-      const dev = normalizeInfraValue(row.device_name);
-      const rk = normalizeInfraValue(row.rk_information);
-
-      if (dev) {
-        const scopedDev = `${scope}|${dev}`;
-        deviceCountMap[scopedDev] = (deviceCountMap[scopedDev] || 0) + 1;
-      }
-      if (rk) {
-        const scopedRk = `${scope}|${rk}`;
-        rkCountMap[scopedRk] = (rkCountMap[scopedRk] || 0) + 1;
-      }
-    });
-
-    const clusterTracker: Record<string, InfraClusterInfo> = {};
-    let badDateCount = 0;
-
-    const enriched: EnrichedIncident[] = incidents.map((row) => {
-      const ttrEval = evaluateTtr(row.reported_date, row.customer_type);
-      if (!ttrEval.isDateValid) badDateCount++;
-
-      const manjaCat = classifyStatusManja(row.booking_date);
-
-      const hasOfficialGamas = Boolean(
-        row.ticket_id_gamas &&
-          row.ticket_id_gamas.trim() !== "" &&
-          row.ticket_id_gamas !== "-"
-      );
-
-      let gamasCat: GamasCategory = "NON_GAMAS";
-
-      if (hasOfficialGamas) {
-        gamasCat = "GAMAS";
-      } else {
-        const wtUpper = (row.witel || "").toUpperCase().trim();
-        const wzUpper = (row.workzone || "").toUpperCase().trim();
-        const scope = `${wtUpper}_${wzUpper}`;
+        const scope = `${(row.witel || "").toUpperCase().trim()}_${(
+          row.workzone || ""
+        )
+          .toUpperCase()
+          .trim()}`;
         const dev = normalizeInfraValue(row.device_name);
         const rk = normalizeInfraValue(row.rk_information);
 
-        const devCount = dev ? deviceCountMap[`${scope}|${dev}`] || 0 : 0;
-        const rkCount = rk ? rkCountMap[`${scope}|${rk}`] || 0 : 0;
+        if (dev) {
+          const scopedDev = `${scope}|${dev}`;
+          deviceCountMap[scopedDev] = (deviceCountMap[scopedDev] || 0) + 1;
+        }
+        if (rk) {
+          const scopedRk = `${scope}|${rk}`;
+          rkCountMap[scopedRk] = (rkCountMap[scopedRk] || 0) + 1;
+        }
+      });
 
-        const isDevPotensi = dev !== "" && devCount >= POTENSI_DEVICE_THRESHOLD;
-        const isRkPotensi = rk !== "" && rkCount >= POTENSI_RK_THRESHOLD;
+      const clusterTracker: Record<string, InfraClusterInfo> = {};
+      let badDateCount = 0;
 
-        if (isDevPotensi || isRkPotensi) {
-          gamasCat = "POTENSI_GAMAS";
+      const enriched: EnrichedIncident[] = incidents.map((row) => {
+        const ttrEval = evaluateTtr(row.reported_date, row.customer_type);
+        if (!ttrEval.isDateValid) badDateCount++;
 
-          if (isDevPotensi) {
-            const devClusterId = `${scope}|DEV:${dev}`;
-            if (!clusterTracker[devClusterId]) {
-              clusterTracker[devClusterId] = {
-                id: devClusterId,
-                type: "DEV",
-                rawName: dev,
-                label: dev,
-                witel: wtUpper,
-                workzone: wzUpper,
-                count: devCount,
-              };
+        const manjaCat = classifyStatusManja(row.booking_date);
+
+        const hasOfficialGamas = Boolean(
+          row.ticket_id_gamas &&
+            row.ticket_id_gamas.trim() !== "" &&
+            row.ticket_id_gamas !== "-"
+        );
+
+        let gamasCat: GamasCategory = "NON_GAMAS";
+
+        if (hasOfficialGamas) {
+          gamasCat = "GAMAS";
+        } else {
+          const wtUpper = (row.witel || "").toUpperCase().trim();
+          const wzUpper = (row.workzone || "").toUpperCase().trim();
+          const scope = `${wtUpper}_${wzUpper}`;
+          const dev = normalizeInfraValue(row.device_name);
+          const rk = normalizeInfraValue(row.rk_information);
+
+          const devCount = dev ? deviceCountMap[`${scope}|${dev}`] || 0 : 0;
+          const rkCount = rk ? rkCountMap[`${scope}|${rk}`] || 0 : 0;
+
+          const isDevPotensi = dev !== "" && devCount >= POTENSI_DEVICE_THRESHOLD;
+          const isRkPotensi = rk !== "" && rkCount >= POTENSI_RK_THRESHOLD;
+
+          if (isDevPotensi || isRkPotensi) {
+            gamasCat = "POTENSI_GAMAS";
+
+            if (isDevPotensi) {
+              const devClusterId = `${scope}|DEV:${dev}`;
+              if (!clusterTracker[devClusterId]) {
+                clusterTracker[devClusterId] = {
+                  id: devClusterId,
+                  type: "DEV",
+                  rawName: dev,
+                  label: dev,
+                  witel: wtUpper,
+                  workzone: wzUpper,
+                  count: devCount,
+                };
+              }
             }
-          }
 
-          if (isRkPotensi) {
-            const rkClusterId = `${scope}|RK:${rk}`;
-            if (!clusterTracker[rkClusterId]) {
-              clusterTracker[rkClusterId] = {
-                id: rkClusterId,
-                type: "RK",
-                rawName: rk,
-                label: rk,
-                witel: wtUpper,
-                workzone: wzUpper,
-                count: rkCount,
-              };
+            if (isRkPotensi) {
+              const rkClusterId = `${scope}|RK:${rk}`;
+              if (!clusterTracker[rkClusterId]) {
+                clusterTracker[rkClusterId] = {
+                  id: rkClusterId,
+                  type: "RK",
+                  rawName: rk,
+                  label: rk,
+                  witel: wtUpper,
+                  workzone: wzUpper,
+                  count: rkCount,
+                };
+              }
             }
           }
         }
-      }
 
-      const searchBlob = [
-        row.incident,
-        row.workzone,
-        row.witel,
-        row.service_no,
-        row.customer_name,
-        row.contact_name,
-        row.ticket_id_gamas,
-        row.device_name,
-        row.rk_information,
-        row.urgency,
-        row.symptom,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+        const searchBlob = [
+          row.incident,
+          row.workzone,
+          row.witel,
+          row.service_no,
+          row.customer_name,
+          row.contact_name,
+          row.ticket_id_gamas,
+          row.device_name,
+          row.rk_information,
+          row.urgency,
+          row.symptom,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return {
+          ...row,
+          _ttr: ttrEval,
+          _manja: manjaCat,
+          _gamasCat: gamasCat,
+          _searchBlob: searchBlob,
+        };
+      });
+
+      const sortClusterFn = (a: InfraClusterInfo, b: InfraClusterInfo) =>
+        b.count - a.count || a.rawName.localeCompare(b.rawName);
+
+      const allClusters = Object.values(clusterTracker);
+      const rkList = allClusters
+        .filter((c) => c.type === "RK")
+        .sort(sortClusterFn);
+      const devList = allClusters
+        .filter((c) => c.type === "DEV")
+        .sort(sortClusterFn);
 
       return {
-        ...row,
-        _ttr: ttrEval,
-        _manja: manjaCat,
-        _gamasCat: gamasCat,
-        _searchBlob: searchBlob,
+        enrichedIncidents: enriched,
+        rkClusters: rkList,
+        devClusters: devList,
+        invalidDateCount: badDateCount,
       };
-    });
-
-    const sortClusterFn = (a: InfraClusterInfo, b: InfraClusterInfo) =>
-      b.count - a.count || a.rawName.localeCompare(b.rawName);
-
-    const allClusters = Object.values(clusterTracker);
-    const rkList = allClusters.filter((c) => c.type === "RK").sort(sortClusterFn);
-    const devList = allClusters.filter((c) => c.type === "DEV").sort(sortClusterFn);
-
-    return {
-      enrichedIncidents: enriched,
-      rkClusters: rkList,
-      devClusters: devList,
-      invalidDateCount: badDateCount,
-    };
-  }, [incidents]);
+    }, [incidents]);
 
   const globalStats = useMemo(() => {
     const total = enrichedIncidents.length;
@@ -589,7 +607,9 @@ export default function DashboardPage({
     CARD_STATUS_ORDER.forEach((k) => (statusMap[k] = { jakbar: 0, jakut: 0 }));
 
     const serviceMap: Record<string, { jakbar: number; jakut: number }> = {};
-    CARD_SERVICE_ORDER.forEach((k) => (serviceMap[k] = { jakbar: 0, jakut: 0 }));
+    CARD_SERVICE_ORDER.forEach(
+      (k) => (serviceMap[k] = { jakbar: 0, jakut: 0 })
+    );
 
     const manjaMap: Record<string, { jakbar: number; jakut: number }> = {};
     CARD_MANJA_ORDER.forEach((k) => (manjaMap[k] = { jakbar: 0, jakut: 0 }));
@@ -652,7 +672,9 @@ export default function DashboardPage({
       map: Record<string, { jakbar: number; jakut: number }>,
       orderedKeys: string[]
     ): PillRowItem[] => {
-      const extraKeys = Object.keys(map).filter((k) => !orderedKeys.includes(k));
+      const extraKeys = Object.keys(map).filter(
+        (k) => !orderedKeys.includes(k)
+      );
       return [...orderedKeys, ...extraKeys].map((k) => {
         const item = map[k] || { jakbar: 0, jakut: 0 };
         return {
@@ -664,12 +686,16 @@ export default function DashboardPage({
       });
     };
 
-    const jakbarSharePct = total > 0 ? Math.round((jakbarCount / total) * 100) : 0;
-    const jakutSharePct = total > 0 ? Math.round((jakutCount / total) * 100) : 0;
+    const jakbarSharePct =
+      total > 0 ? Math.round((jakbarCount / total) * 100) : 0;
+    const jakutSharePct =
+      total > 0 ? Math.round((jakutCount / total) * 100) : 0;
     const hvcSharePct = total > 0 ? Math.round((hvcTotal / total) * 100) : 0;
     const regSharePct = total > 0 ? Math.round((regTotal / total) * 100) : 0;
     const inSlaRatePct =
-      total > 0 ? (((total - ttrExpiredTotal) / total) * 100).toFixed(1) : "100.0";
+      total > 0
+        ? (((total - ttrExpiredTotal) / total) * 100).toFixed(1)
+        : "100.0";
 
     return {
       total,
@@ -710,7 +736,10 @@ export default function DashboardPage({
 
   const formatSegmentHeader = (seg: string) => seg.replace("HVC_", "");
 
-  const buildWitelMatrix = (witelKeyword: string, standardWorkzones: string[]) => {
+  const buildWitelMatrix = (
+    witelKeyword: string,
+    standardWorkzones: string[]
+  ) => {
     const rows = enrichedIncidents.filter((i) =>
       (i.witel || "").toUpperCase().includes(witelKeyword)
     );
@@ -822,7 +851,6 @@ export default function DashboardPage({
     [enrichedIncidents, matrixSegments]
   );
 
-  // Copy Laporan WA sesuai format baku
   const handleCopyWaReport = () => {
     const formatStoLine = (idx: number, row: WorkzoneMatrixRow) => {
       const diamond = row.segCounts["HVC_DIAMOND"] || 0;
@@ -833,7 +861,9 @@ export default function DashboardPage({
       return `${idx + 1}. ${row.workzone} / ${diamond} / ${platinum} / ${gold} / ${reguler} / ${row.manja} / ${row.rowTotal} ${statusIcon}`;
     };
 
-    const jakutLines = jakutMatrix.workzones.map((row, idx) => formatStoLine(idx, row));
+    const jakutLines = jakutMatrix.workzones.map((row, idx) =>
+      formatStoLine(idx, row)
+    );
     const jktD = jakutMatrix.segColTotals["HVC_DIAMOND"] || 0;
     const jktP = jakutMatrix.segColTotals["HVC_PLATINUM"] || 0;
     const jktG = jakutMatrix.segColTotals["HVC_GOLD"] || 0;
@@ -841,7 +871,9 @@ export default function DashboardPage({
     const jktIcon = jakutMatrix.totalTickets === 0 ? "✅" : "❌";
     const totalJakutLine = `TOTAL : JAKUT / ${jktD} / ${jktP} / ${jktG} / ${jktR} / ${jakutMatrix.totalManja} / ${jakutMatrix.totalTickets} ${jktIcon}`;
 
-    const jakbarLines = jakbarMatrix.workzones.map((row, idx) => formatStoLine(idx, row));
+    const jakbarLines = jakbarMatrix.workzones.map((row, idx) =>
+      formatStoLine(idx, row)
+    );
     const jkbD = jakbarMatrix.segColTotals["HVC_DIAMOND"] || 0;
     const jkbP = jakbarMatrix.segColTotals["HVC_PLATINUM"] || 0;
     const jkbG = jakbarMatrix.segColTotals["HVC_GOLD"] || 0;
@@ -859,7 +891,7 @@ export default function DashboardPage({
     const totalNorthrenLine = `TOTAL : NORTHREN / ${totD} / ${totP} / ${totG} / ${totR} / ${totManja} / ${totAll} ${totIcon}`;
 
     const reportText = [
-      "MONITORING TIKET OPEN NORTHERNJAKARTA",
+      waReportHeader,
       "",
       "NO / STO / DIAMOND / PLATINUM / GOLD / REGULER / MANJA / TOTAL TIKET",
       ...jakutLines,
@@ -875,7 +907,9 @@ export default function DashboardPage({
   };
 
   const filterOptions = useMemo(() => {
-    const witels = Array.from(new Set(enrichedIncidents.map((i) => i.witel).filter(Boolean))).sort();
+    const witels = Array.from(
+      new Set(enrichedIncidents.map((i) => i.witel).filter(Boolean))
+    ).sort();
     const workzones = Array.from(
       new Set([
         ...BAKU_WZ_JAKUT,
@@ -883,9 +917,14 @@ export default function DashboardPage({
         ...enrichedIncidents.map((i) => i.workzone).filter(Boolean),
       ])
     ).sort();
-    const statuses = Array.from(new Set(enrichedIncidents.map((i) => i.status).filter(Boolean))).sort();
+    const statuses = Array.from(
+      new Set(enrichedIncidents.map((i) => i.status).filter(Boolean))
+    ).sort();
     const custTypes = Array.from(
-      new Set([...BAKU_SEGMEN, ...enrichedIncidents.map((i) => i.customer_type).filter(Boolean)])
+      new Set([
+        ...BAKU_SEGMEN,
+        ...enrichedIncidents.map((i) => i.customer_type).filter(Boolean),
+      ])
     );
     const urgencies = Array.from(
       new Set(
@@ -901,22 +940,37 @@ export default function DashboardPage({
     const q = search.trim().toLowerCase();
     return enrichedIncidents.filter((item) => {
       if (filterWitel !== "ALL" && item.witel !== filterWitel) return false;
-      if (filterWorkzone !== "ALL" && item.workzone !== filterWorkzone) return false;
+      if (filterWorkzone !== "ALL" && item.workzone !== filterWorkzone)
+        return false;
       if (filterStatus !== "ALL" && item.status !== filterStatus) return false;
-      if (filterCustType !== "ALL" && item.customer_type !== filterCustType) return false;
-      if (filterUrgency !== "ALL" && (item.urgency || "").trim() !== filterUrgency) return false;
+      if (filterCustType !== "ALL" && item.customer_type !== filterCustType)
+        return false;
+      if (
+        filterUrgency !== "ALL" &&
+        (item.urgency || "").trim() !== filterUrgency
+      )
+        return false;
       if (filterGamas !== "ALL" && item._gamasCat !== filterGamas) return false;
 
       if (activeClusterFilter) {
-        if ((item.workzone || "").toUpperCase().trim() !== activeClusterFilter.workzone) {
+        if (
+          (item.workzone || "").toUpperCase().trim() !==
+          activeClusterFilter.workzone
+        ) {
           return false;
         }
         if (activeClusterFilter.type === "DEV") {
-          if (normalizeInfraValue(item.device_name) !== activeClusterFilter.rawName) {
+          if (
+            normalizeInfraValue(item.device_name) !==
+            activeClusterFilter.rawName
+          ) {
             return false;
           }
         } else {
-          if (normalizeInfraValue(item.rk_information) !== activeClusterFilter.rawName) {
+          if (
+            normalizeInfraValue(item.rk_information) !==
+            activeClusterFilter.rawName
+          ) {
             return false;
           }
         }
@@ -1018,21 +1072,29 @@ export default function DashboardPage({
           .join(",");
       }),
     ];
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([csvRows.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Laporan_Gangguan_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `${csvFilePrefix}_${new Date().toISOString().slice(0, 10)}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Donut Chart SVG Calculation
   const radius = 33;
   const circumference = 2 * Math.PI * radius;
-  const jakutPct = globalStats.total ? globalStats.jakutCount / globalStats.total : 0;
-  const jakbarPct = globalStats.total ? globalStats.jakbarCount / globalStats.total : 0;
+  const jakutPct = globalStats.total
+    ? globalStats.jakutCount / globalStats.total
+    : 0;
+  const jakbarPct = globalStats.total
+    ? globalStats.jakbarCount / globalStats.total
+    : 0;
   const jakutStroke = jakutPct * circumference;
   const jakbarStroke = jakbarPct * circumference;
 
@@ -1157,16 +1219,19 @@ export default function DashboardPage({
                     fontSize: "9.5px",
                     cursor: onRowClick ? "pointer" : "default",
                   }}
-                  title={onRowClick ? `Klik untuk filter ${r.label}` : undefined}
+                  title={
+                    onRowClick ? `Klik untuk filter ${r.label}` : undefined
+                  }
                 >
                   <span
                     style={{
                       color: isSelected
-                        ? "#1d4ed8"
+                        ? accentColor
                         : customStyle && r.total > 0
                         ? customStyle.labelColor
                         : "#334155",
-                      fontWeight: isSelected || (customStyle && r.total > 0) ? 700 : 600,
+                      fontWeight:
+                        isSelected || (customStyle && r.total > 0) ? 700 : 600,
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -1231,7 +1296,11 @@ export default function DashboardPage({
       borderLeft: "2px solid #cbd5e1",
     };
 
-    const formatMatrixZero = (val: number, activeColor: string, bold = false) => ({
+    const formatMatrixZero = (
+      val: number,
+      activeColor: string,
+      bold = false
+    ) => ({
       color: val === 0 ? "#cbd5e1" : activeColor,
       fontWeight: val === 0 ? 400 : bold ? 800 : 600,
     });
@@ -1250,7 +1319,7 @@ export default function DashboardPage({
       >
         <div
           style={{
-            background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)",
+            background: accentGradient,
             padding: "5.5px 12px",
             display: "flex",
             justifyContent: "space-between",
@@ -1285,7 +1354,13 @@ export default function DashboardPage({
         </div>
 
         <div style={{ overflowX: "auto", width: "100%" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              textAlign: "left",
+            }}
+          >
             <thead>
               <tr style={{ background: "#f1f5f9" }}>
                 <th
@@ -1404,7 +1479,7 @@ export default function DashboardPage({
                     padding: "3.5px 4px",
                     fontSize: "9px",
                     fontWeight: 800,
-                    color: "#1e3a8a",
+                    color: accentColor,
                     textAlign: "center",
                     width: "42px",
                     background: "#eff6ff",
@@ -1592,7 +1667,7 @@ export default function DashboardPage({
                         padding: "3.5px 6px",
                         fontSize: "10.5px",
                         fontWeight: 700,
-                        color: isSelected ? "#1d4ed8" : "#0f172a",
+                        color: isSelected ? accentColor : "#0f172a",
                         borderBottom: "1px solid #e2e8f0",
                       }}
                     >
@@ -1631,14 +1706,14 @@ export default function DashboardPage({
                       <span
                         style={{
                           background: isSelected
-                            ? "#1d4ed8"
+                            ? accentColor
                             : row.rowTotal > 0
                             ? "#dbeafe"
                             : "transparent",
                           color: isSelected
                             ? "#ffffff"
                             : row.rowTotal > 0
-                            ? "#1e3a8a"
+                            ? accentColor
                             : "#cbd5e1",
                           fontWeight: row.rowTotal > 0 ? 800 : 400,
                           fontSize: "10px",
@@ -1671,14 +1746,17 @@ export default function DashboardPage({
                     </td>
 
                     <td
-                      onClick={(e) => applyCellFilter(e, { gamas: "POTENSI_GAMAS" })}
+                      onClick={(e) =>
+                        applyCellFilter(e, { gamas: "POTENSI_GAMAS" })
+                      }
                       style={{
                         padding: "3.5px 4px",
                         fontSize: "10.5px",
                         textAlign: "center",
                         fontVariantNumeric: "tabular-nums",
                         borderBottom: "1px solid #e2e8f0",
-                        background: row.potensiGamas > 0 ? "#fef3c7" : undefined,
+                        background:
+                          row.potensiGamas > 0 ? "#fef3c7" : undefined,
                         ...formatMatrixZero(row.potensiGamas, "#b45309", true),
                       }}
                       title={`Filter ${row.workzone} - Potensi Gamas (Device ≥ 2 atau RK ≥ 3)`}
@@ -1687,7 +1765,9 @@ export default function DashboardPage({
                     </td>
 
                     <td
-                      onClick={(e) => applyCellFilter(e, { gamas: "NON_GAMAS" })}
+                      onClick={(e) =>
+                        applyCellFilter(e, { gamas: "NON_GAMAS" })
+                      }
                       style={{
                         padding: "3.5px 4px",
                         fontSize: "10.5px",
@@ -1702,7 +1782,9 @@ export default function DashboardPage({
                     </td>
 
                     <td
-                      onClick={(e) => applyCellFilter(e, { manja: "ANY_MANJA" })}
+                      onClick={(e) =>
+                        applyCellFilter(e, { manja: "ANY_MANJA" })
+                      }
                       style={{
                         padding: "3.5px 4px",
                         fontSize: "10.5px",
@@ -1718,7 +1800,9 @@ export default function DashboardPage({
                     </td>
 
                     <td
-                      onClick={(e) => applyCellFilter(e, { manja: "NON MANJA" })}
+                      onClick={(e) =>
+                        applyCellFilter(e, { manja: "NON MANJA" })
+                      }
                       style={{
                         padding: "3.5px 4px",
                         fontSize: "10.5px",
@@ -1749,7 +1833,9 @@ export default function DashboardPage({
                     </td>
 
                     <td
-                      onClick={(e) => applyCellFilter(e, { ttr: "SLA Kritis" })}
+                      onClick={(e) =>
+                        applyCellFilter(e, { ttr: "SLA Kritis" })
+                      }
                       style={{
                         padding: "3.5px 4px",
                         fontSize: "10.5px",
@@ -1765,7 +1851,9 @@ export default function DashboardPage({
                     </td>
 
                     <td
-                      onClick={(e) => applyCellFilter(e, { ttr: "TTR Expired" })}
+                      onClick={(e) =>
+                        applyCellFilter(e, { ttr: "TTR Expired" })
+                      }
                       style={{
                         padding: "3.5px 4px",
                         fontSize: "10.5px",
@@ -1783,7 +1871,6 @@ export default function DashboardPage({
                 );
               })}
 
-              {/* BARIS GRAND TOTAL */}
               <tr style={{ background: "#e2e8f0" }}>
                 <td
                   colSpan={2}
@@ -1827,7 +1914,7 @@ export default function DashboardPage({
                 >
                   <span
                     style={{
-                      background: "#1e3a8a",
+                      background: accentColor,
                       color: "#ffffff",
                       fontWeight: 800,
                       fontSize: "10px",
@@ -1863,8 +1950,13 @@ export default function DashboardPage({
                     textAlign: "center",
                     fontVariantNumeric: "tabular-nums",
                     borderTop: "2px solid #94a3b8",
-                    background: matrix.totalPotensiGamas > 0 ? "#fef3c7" : undefined,
-                    ...formatMatrixZero(matrix.totalPotensiGamas, "#b45309", true),
+                    background:
+                      matrix.totalPotensiGamas > 0 ? "#fef3c7" : undefined,
+                    ...formatMatrixZero(
+                      matrix.totalPotensiGamas,
+                      "#b45309",
+                      true
+                    ),
                   }}
                 >
                   {matrix.totalPotensiGamas}
@@ -1928,7 +2020,8 @@ export default function DashboardPage({
                     textAlign: "center",
                     fontVariantNumeric: "tabular-nums",
                     borderTop: "2px solid #94a3b8",
-                    background: matrix.totalSlaKritis > 0 ? "#fef3c7" : undefined,
+                    background:
+                      matrix.totalSlaKritis > 0 ? "#fef3c7" : undefined,
                     ...formatMatrixZero(matrix.totalSlaKritis, "#b45309", true),
                   }}
                 >
@@ -1941,8 +2034,13 @@ export default function DashboardPage({
                     textAlign: "center",
                     fontVariantNumeric: "tabular-nums",
                     borderTop: "2px solid #94a3b8",
-                    background: matrix.totalTtrExpired > 0 ? "#fee2e2" : undefined,
-                    ...formatMatrixZero(matrix.totalTtrExpired, "#b91c1c", true),
+                    background:
+                      matrix.totalTtrExpired > 0 ? "#fee2e2" : undefined,
+                    ...formatMatrixZero(
+                      matrix.totalTtrExpired,
+                      "#b91c1c",
+                      true
+                    ),
                   }}
                 >
                   {matrix.totalTtrExpired}
@@ -2110,7 +2208,14 @@ export default function DashboardPage({
   const hasAnyCluster = rkClusters.length > 0 || devClusters.length > 0;
 
   return (
-    <div style={{ width: "100%", maxWidth: "1320px", margin: "0 auto", padding: "8px 12px" }}>
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "1320px",
+        margin: "0 auto",
+        padding: "8px 12px",
+      }}
+    >
       {/* HEADER BAR EXECUTIVE FORMAL */}
       <div
         style={{
@@ -2128,10 +2233,28 @@ export default function DashboardPage({
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: "16.5px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>
-            Monitoring Gangguan Branch Northern Jakarta – {todayTitle}
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "16.5px",
+              fontWeight: 800,
+              color: "#0f172a",
+              letterSpacing: "-0.2px",
+            }}
+          >
+            {dashboardTitle} – {todayTitle}
           </h1>
-          <div style={{ fontSize: "11.5px", color: "#64748b", marginTop: "2px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <div
+            style={{
+              fontSize: "11.5px",
+              color: "#64748b",
+              marginTop: "2px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
             <span>
               Last Sync DB:{" "}
               <strong
@@ -2147,7 +2270,10 @@ export default function DashboardPage({
             </span>
             <span>•</span>
             <span>
-              Total Sumber Data: <strong style={{ color: "#1e3a8a" }}>{incidents.length} Tiket</strong>
+              Total Sumber Data:{" "}
+              <strong style={{ color: accentColor }}>
+                {incidents.length} Tiket
+              </strong>
             </span>
             {invalidDateCount > 0 && (
               <span
@@ -2204,9 +2330,9 @@ export default function DashboardPage({
             onClick={onRefresh}
             disabled={loading}
             style={{
-              background: "#1e3a8a",
+              background: accentColor,
               color: "#fff",
-              border: "1px solid #1e3a8a",
+              border: `1px solid ${accentColor}`,
               padding: "5px 14px",
               borderRadius: "6px",
               fontSize: "11.5px",
@@ -2219,7 +2345,7 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* ASYMMETRIC SPLIT LAYOUT: KIRI (KPI SIDEBAR) | KANAN (TABEL MATRIKS JAKUT & JAKBAR) */}
+      {/* ASYMMETRIC SPLIT LAYOUT */}
       <div className="exec-split-layout" style={{ marginBottom: "10px" }}>
         <div className="exec-left-kpi-col">
           {/* HERO CARD: TOTAL TIKET AKTIF */}
@@ -2256,8 +2382,20 @@ export default function DashboardPage({
                 gap: "12px",
               }}
             >
-              <svg width="96" height="96" viewBox="0 0 88 88" style={{ flexShrink: 0 }}>
-                <circle cx="44" cy="44" r={radius} fill="transparent" stroke="#e2e8f0" strokeWidth="9" />
+              <svg
+                width="96"
+                height="96"
+                viewBox="0 0 88 88"
+                style={{ flexShrink: 0 }}
+              >
+                <circle
+                  cx="44"
+                  cy="44"
+                  r={radius}
+                  fill="transparent"
+                  stroke="#e2e8f0"
+                  strokeWidth="9"
+                />
                 {globalStats.total > 0 && (
                   <>
                     <circle
@@ -2283,10 +2421,24 @@ export default function DashboardPage({
                     />
                   </>
                 )}
-                <text x="44" y="42" textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="800">
+                <text
+                  x="44"
+                  y="42"
+                  textAnchor="middle"
+                  fill="#0f172a"
+                  fontSize="19"
+                  fontWeight="800"
+                >
                   {globalStats.total}
                 </text>
-                <text x="44" y="54" textAnchor="middle" fill="#64748b" fontSize="6.8" fontWeight="700">
+                <text
+                  x="44"
+                  y="54"
+                  textAnchor="middle"
+                  fill="#64748b"
+                  fontSize="6.8"
+                  fontWeight="700"
+                >
                   OPEN TIKET
                 </text>
               </svg>
@@ -2294,9 +2446,12 @@ export default function DashboardPage({
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
                 <div
                   className="exec-metric-row"
-                  onClick={() => setFilterWitel(filterWitel === "JAKBAR" ? "ALL" : "JAKBAR")}
+                  onClick={() =>
+                    setFilterWitel(filterWitel === "JAKBAR" ? "ALL" : "JAKBAR")
+                  }
                   style={{
-                    background: filterWitel === "JAKBAR" ? "#eff6ff" : "transparent",
+                    background:
+                      filterWitel === "JAKBAR" ? "#eff6ff" : "transparent",
                     borderBottom: "1px solid #e2e8f0",
                     padding: "6px 4px",
                     display: "flex",
@@ -2306,13 +2461,41 @@ export default function DashboardPage({
                     cursor: "pointer",
                   }}
                 >
-                  <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e293b", fontWeight: 700 }}>
-                    <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#1e3a8a", display: "inline-block" }} />
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      color: "#1e293b",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "2px",
+                        background: "#1e3a8a",
+                        display: "inline-block",
+                      }}
+                    />
                     Witel JAKBAR
                   </span>
-                  <span style={{ color: "#0f172a", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                  <span
+                    style={{
+                      color: "#0f172a",
+                      fontWeight: 800,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
                     {globalStats.jakbarCount}{" "}
-                    <span style={{ color: "#64748b", fontWeight: 600, fontSize: "10px" }}>
+                    <span
+                      style={{
+                        color: "#64748b",
+                        fontWeight: 600,
+                        fontSize: "10px",
+                      }}
+                    >
                       ({globalStats.jakbarSharePct}%)
                     </span>
                   </span>
@@ -2320,9 +2503,12 @@ export default function DashboardPage({
 
                 <div
                   className="exec-metric-row"
-                  onClick={() => setFilterWitel(filterWitel === "JAKUT" ? "ALL" : "JAKUT")}
+                  onClick={() =>
+                    setFilterWitel(filterWitel === "JAKUT" ? "ALL" : "JAKUT")
+                  }
                   style={{
-                    background: filterWitel === "JAKUT" ? "#f0fdfa" : "transparent",
+                    background:
+                      filterWitel === "JAKUT" ? "#f0fdfa" : "transparent",
                     padding: "6px 4px",
                     display: "flex",
                     justifyContent: "space-between",
@@ -2331,13 +2517,41 @@ export default function DashboardPage({
                     cursor: "pointer",
                   }}
                 >
-                  <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#1e293b", fontWeight: 700 }}>
-                    <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#0d9488", display: "inline-block" }} />
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      color: "#1e293b",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "2px",
+                        background: "#0d9488",
+                        display: "inline-block",
+                      }}
+                    />
                     Witel JAKUT
                   </span>
-                  <span style={{ color: "#0f172a", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                  <span
+                    style={{
+                      color: "#0f172a",
+                      fontWeight: 800,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
                     {globalStats.jakutCount}{" "}
-                    <span style={{ color: "#64748b", fontWeight: 600, fontSize: "10px" }}>
+                    <span
+                      style={{
+                        color: "#64748b",
+                        fontWeight: 600,
+                        fontSize: "10px",
+                      }}
+                    >
                       ({globalStats.jakutSharePct}%)
                     </span>
                   </span>
@@ -2346,17 +2560,40 @@ export default function DashboardPage({
             </div>
           </div>
 
-          {/* 6 KARTU KPI MINI (2 KOLOM x 3 BARIS) */}
+          {/* 6 KARTU KPI MINI */}
           <div className="exec-mini-kpi-grid">
             {renderSidebarKpiCard({
               title: "INDIKASI GAMAS",
               bigValue: (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}>
-                  <span style={{ fontSize: "16px", fontWeight: 800, color: globalStats.gamasTotal > 0 ? "#b91c1c" : "#0f172a" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "5px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 800,
+                      color:
+                        globalStats.gamasTotal > 0 ? "#b91c1c" : "#0f172a",
+                    }}
+                  >
                     {globalStats.gamasTotal}
                   </span>
                   <span style={{ color: "#cbd5e1", fontSize: "13px" }}>|</span>
-                  <span style={{ fontSize: "11.5px", fontWeight: 800, color: globalStats.potensiGamasTotal > 0 ? "#b45309" : "#64748b" }}>
+                  <span
+                    style={{
+                      fontSize: "11.5px",
+                      fontWeight: 800,
+                      color:
+                        globalStats.potensiGamasTotal > 0
+                          ? "#b45309"
+                          : "#64748b",
+                    }}
+                  >
                     Potensi: {globalStats.potensiGamasTotal}
                   </span>
                 </div>
@@ -2388,9 +2625,13 @@ export default function DashboardPage({
                 if (label === "Tiket Gamas") {
                   setFilterGamas(filterGamas === "GAMAS" ? "ALL" : "GAMAS");
                 } else if (label === "Potensi Gamas") {
-                  setFilterGamas(filterGamas === "POTENSI_GAMAS" ? "ALL" : "POTENSI_GAMAS");
+                  setFilterGamas(
+                    filterGamas === "POTENSI_GAMAS" ? "ALL" : "POTENSI_GAMAS"
+                  );
                 } else {
-                  setFilterGamas(filterGamas === "NON_GAMAS" ? "ALL" : "NON_GAMAS");
+                  setFilterGamas(
+                    filterGamas === "NON_GAMAS" ? "ALL" : "NON_GAMAS"
+                  );
                 }
               },
             })}
@@ -2398,12 +2639,20 @@ export default function DashboardPage({
             {renderSidebarKpiCard({
               title: "SEGMEN PELANGGAN",
               bigValue: (
-                <span style={{ fontSize: "11px", fontWeight: 800, color: "#0f172a" }}>
-                  HVC: {globalStats.hvcTotal} ({globalStats.hvcSharePct}%) | REG: {globalStats.regTotal}
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    color: "#0f172a",
+                  }}
+                >
+                  HVC: {globalStats.hvcTotal} ({globalStats.hvcSharePct}%) |
+                  REG: {globalStats.regTotal}
                 </span>
               ),
               bigValueFontSize: "11px",
-              activeFilterValue: filterCustType !== "ALL" ? filterCustType : undefined,
+              activeFilterValue:
+                filterCustType !== "ALL" ? filterCustType : undefined,
               rows: globalStats.segmenRows,
               onRowClick: (label) => {
                 setFilterCustType(filterCustType === label ? "ALL" : label);
@@ -2413,8 +2662,9 @@ export default function DashboardPage({
             {renderSidebarKpiCard({
               title: "STATUS TIKET",
               bigValue: globalStats.total,
-              bigValueColor: "#1e3a8a",
-              activeFilterValue: filterStatus !== "ALL" ? filterStatus : undefined,
+              bigValueColor: accentColor,
+              activeFilterValue:
+                filterStatus !== "ALL" ? filterStatus : undefined,
               rows: globalStats.statusRows,
               onRowClick: (label) => {
                 setFilterStatus(filterStatus === label ? "ALL" : label);
@@ -2439,7 +2689,8 @@ export default function DashboardPage({
                   alertBg: "#fef2f2",
                 },
               },
-              activeFilterValue: filterManja !== "ALL" ? filterManja : undefined,
+              activeFilterValue:
+                filterManja !== "ALL" ? filterManja : undefined,
               rows: globalStats.manjaRows,
               onRowClick: (label) => {
                 setFilterManja(filterManja === label ? "ALL" : label);
@@ -2449,10 +2700,32 @@ export default function DashboardPage({
             {renderSidebarKpiCard({
               title: "STATUS TTR (SLA)",
               bigValue: (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "4px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 800,
+                      color: "#0f172a",
+                    }}
+                  >
                     {globalStats.inSlaRatePct}%{" "}
-                    <span style={{ fontSize: "9.5px", fontWeight: 700, color: "#0d9488" }}>SLA</span>
+                    <span
+                      style={{
+                        fontSize: "9.5px",
+                        fontWeight: 700,
+                        color: "#0d9488",
+                      }}
+                    >
+                      SLA
+                    </span>
                   </span>
                   {globalStats.ttrExpiredTotal > 0 && (
                     <span
@@ -2492,7 +2765,7 @@ export default function DashboardPage({
             })}
           </div>
 
-          {/* PANEL DETEKSI CLUSTER SPLIT 2 KOLOM: BY RK (≥ 3) | BY DEVICE NAME (≥ 2) */}
+          {/* PANEL DETEKSI CLUSTER SPLIT 2 KOLOM */}
           <div
             className="kpi-card"
             style={{
@@ -2531,8 +2804,16 @@ export default function DashboardPage({
 
             <div style={{ padding: "6px" }}>
               {!hasAnyCluster ? (
-                <div style={{ fontSize: "10.5px", color: "#64748b", textAlign: "center", padding: "6px 4px" }}>
-                  Tidak ada akumulasi RK ≥ {POTENSI_RK_THRESHOLD} atau DEV ≥ {POTENSI_DEVICE_THRESHOLD} dalam satu STO.
+                <div
+                  style={{
+                    fontSize: "10.5px",
+                    color: "#64748b",
+                    textAlign: "center",
+                    padding: "6px 4px",
+                  }}
+                >
+                  Tidak ada akumulasi RK ≥ {POTENSI_RK_THRESHOLD} atau DEV ≥{" "}
+                  {POTENSI_DEVICE_THRESHOLD} dalam satu STO.
                 </div>
               ) : (
                 <div
@@ -2561,7 +2842,7 @@ export default function DashboardPage({
           </div>
         </div>
 
-        {/* KOLOM KANAN: TABEL MATRIKS JAKUT (ATAS) & JAKBAR (BAWAH) */}
+        {/* KOLOM KANAN: TABEL MATRIKS JAKUT & JAKBAR */}
         <div className="exec-right-tables-col">
           {renderMatrixCard(
             "REKAP TIKET WITEL JAKUT (SEGMEN × GAMAS × MANJA × TTR)",
@@ -2576,7 +2857,7 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* TABEL DETAIL 21 KOLOM (DENGAN PAGINATION 50 BARIS) */}
+      {/* TABEL DETAIL */}
       <div
         style={{
           background: "#ffffff",
@@ -2596,8 +2877,22 @@ export default function DashboardPage({
             marginBottom: "8px",
           }}
         >
-          <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontWeight: 700, fontSize: "12px", color: "#0f172a", marginRight: "4px" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "5px",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: "12px",
+                color: "#0f172a",
+                marginRight: "4px",
+              }}
+            >
               DETAIL TIKET ({filteredData.length})
             </span>
 
@@ -2613,18 +2908,27 @@ export default function DashboardPage({
                   fontWeight: 700,
                 }}
               >
-                Cluster {activeClusterFilter.type === "RK" ? "RK" : "Device"}: {activeClusterFilter.rawName}
+                Cluster {activeClusterFilter.type === "RK" ? "RK" : "Device"}:{" "}
+                {activeClusterFilter.rawName}
               </span>
             )}
 
             <select
               value={filterWitel}
               onChange={(e) => setFilterWitel(e.target.value)}
-              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
             >
               <option value="ALL">Semua Witel</option>
               {filterOptions.witels.map((w) => (
-                <option key={w} value={w}>{w}</option>
+                <option key={w} value={w}>
+                  {w}
+                </option>
               ))}
             </select>
 
@@ -2634,33 +2938,57 @@ export default function DashboardPage({
                 setActiveClusterFilter(null);
                 setFilterWorkzone(e.target.value);
               }}
-              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
             >
               <option value="ALL">Semua Workzone</option>
               {filterOptions.workzones.map((wz) => (
-                <option key={wz} value={wz}>{wz}</option>
+                <option key={wz} value={wz}>
+                  {wz}
+                </option>
               ))}
             </select>
 
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
             >
               <option value="ALL">Semua Status</option>
               {filterOptions.statuses.map((st) => (
-                <option key={st} value={st}>{st}</option>
+                <option key={st} value={st}>
+                  {st}
+                </option>
               ))}
             </select>
 
             <select
               value={filterCustType}
               onChange={(e) => setFilterCustType(e.target.value)}
-              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
             >
               <option value="ALL">Semua Segmen</option>
               {filterOptions.custTypes.map((ct) => (
-                <option key={ct} value={ct}>{ct}</option>
+                <option key={ct} value={ct}>
+                  {ct}
+                </option>
               ))}
             </select>
 
@@ -2670,45 +2998,77 @@ export default function DashboardPage({
                 setActiveClusterFilter(null);
                 setFilterGamas(e.target.value);
               }}
-              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
             >
               <option value="ALL">Semua Status Gamas</option>
               <option value="GAMAS">Tiket Gamas (ID Resmi)</option>
-              <option value="POTENSI_GAMAS">Potensi Gamas (DEV ≥ 2 / RK ≥ 3)</option>
+              <option value="POTENSI_GAMAS">
+                Potensi Gamas (DEV ≥ 2 / RK ≥ 3)
+              </option>
               <option value="NON_GAMAS">Non-Gamas</option>
             </select>
 
             <select
               value={filterManja}
               onChange={(e) => setFilterManja(e.target.value)}
-              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
             >
               <option value="ALL">Semua Status Manja</option>
               <option value="ANY_MANJA">Semua Manja (Booking)</option>
               {CARD_MANJA_ORDER.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
 
             <select
               value={filterTtr}
               onChange={(e) => setFilterTtr(e.target.value)}
-              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
             >
               <option value="ALL">Semua Status TTR</option>
               {CARD_TTR_ORDER.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>
+                  {t}
+                </option>
               ))}
             </select>
 
             <select
               value={filterUrgency}
               onChange={(e) => setFilterUrgency(e.target.value)}
-              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11.5px", background: "#fff" }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "11.5px",
+                background: "#fff",
+              }}
             >
               <option value="ALL">Semua Urgency</option>
               {filterOptions.urgencies.map((u) => (
-                <option key={u} value={u}>{u}</option>
+                <option key={u} value={u}>
+                  {u}
+                </option>
               ))}
             </select>
 
@@ -2737,13 +3097,39 @@ export default function DashboardPage({
             placeholder="Cari INCIDENT / DEVICE / RK / URGENCY..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: "4px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", width: "245px", fontSize: "11.5px" }}
+            style={{
+              padding: "4px 10px",
+              borderRadius: "6px",
+              border: "1px solid #cbd5e1",
+              width: "245px",
+              fontSize: "11.5px",
+            }}
           />
         </div>
 
-        <div style={{ overflowX: "auto", border: "1px solid #cbd5e1", borderRadius: "6px", maxHeight: "56vh" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-            <thead style={{ background: "#f8fafc", position: "sticky", top: 0, zIndex: 1 }}>
+        <div
+          style={{
+            overflowX: "auto",
+            border: "1px solid #cbd5e1",
+            borderRadius: "6px",
+            maxHeight: "56vh",
+          }}
+        >
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              textAlign: "left",
+            }}
+          >
+            <thead
+              style={{
+                background: "#f8fafc",
+                position: "sticky",
+                top: 0,
+                zIndex: 1,
+              }}
+            >
               <tr>
                 <th style={thStyle}>INCIDENT</th>
                 <th style={thStyle}>REPORTED DATE</th>
@@ -2771,7 +3157,15 @@ export default function DashboardPage({
             <tbody>
               {displayedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={21} style={{ padding: "20px", textAlign: "center", color: "#64748b", fontSize: "12.5px" }}>
+                  <td
+                    colSpan={21}
+                    style={{
+                      padding: "20px",
+                      textAlign: "center",
+                      color: "#64748b",
+                      fontSize: "12.5px",
+                    }}
+                  >
                     Tidak ada data tiket yang sesuai dengan filter saat ini.
                   </td>
                 </tr>
@@ -2792,17 +3186,37 @@ export default function DashboardPage({
                   const ttrEval = row._ttr;
                   const ttrBadgeStyle: React.CSSProperties =
                     ttrEval.status === "TTR Expired"
-                      ? { background: "#fee2e2", color: "#b91c1c", border: "1px solid #fecaca" }
+                      ? {
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          border: "1px solid #fecaca",
+                        }
                       : ttrEval.status === "SLA Kritis"
-                      ? { background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a" }
-                      : { background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0" };
+                      ? {
+                          background: "#fef3c7",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                        }
+                      : {
+                          background: "#dcfce7",
+                          color: "#15803d",
+                          border: "1px solid #bbf7d0",
+                        };
 
                   const gCat = row._gamasCat;
                   const gamasBadgeStyle: React.CSSProperties =
                     gCat === "GAMAS"
-                      ? { background: "#fee2e2", color: "#b91c1c", border: "1px solid #fecaca" }
+                      ? {
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          border: "1px solid #fecaca",
+                        }
                       : gCat === "POTENSI_GAMAS"
-                      ? { background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a" }
+                      ? {
+                          background: "#fef3c7",
+                          color: "#b45309",
+                          border: "1px solid #fde68a",
+                        }
                       : { background: "#f1f5f9", color: "#475569" };
                   const gamasBadgeLabel =
                     gCat === "GAMAS"
@@ -2819,11 +3233,29 @@ export default function DashboardPage({
                     urgUpper === "1";
 
                   return (
-                    <tr key={row.incident} className="detail-row" style={{ borderBottom: "1px solid #e2e8f0" }}>
-                      <td style={{ ...tdStyle, fontWeight: 700, color: "#1e3a8a" }}>{row.incident}</td>
+                    <tr
+                      key={row.incident}
+                      className="detail-row"
+                      style={{ borderBottom: "1px solid #e2e8f0" }}
+                    >
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontWeight: 700,
+                          color: accentColor,
+                        }}
+                      >
+                        {row.incident}
+                      </td>
                       <td style={tdStyle}>{row.reported_date || "-"}</td>
                       <td style={tdStyle}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                        >
                           <span
                             style={{
                               ...ttrBadgeStyle,
@@ -2835,7 +3267,13 @@ export default function DashboardPage({
                           >
                             {ttrEval.status}
                           </span>
-                          <span style={{ fontSize: "10.5px", color: "#64748b", fontWeight: 600 }}>
+                          <span
+                            style={{
+                              fontSize: "10.5px",
+                              color: "#64748b",
+                              fontWeight: 600,
+                            }}
+                          >
                             ({ttrEval.elapsedText})
                           </span>
                         </div>
@@ -2869,7 +3307,9 @@ export default function DashboardPage({
                       </td>
                       <td style={tdStyle}>{row.service_type || "-"}</td>
                       <td style={tdStyle}>{row.witel || "-"}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{row.workzone || "-"}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        {row.workzone || "-"}
+                      </td>
                       <td style={tdStyle}>
                         <span
                           style={{
@@ -2877,8 +3317,18 @@ export default function DashboardPage({
                             borderRadius: "4px",
                             fontSize: "10.5px",
                             fontWeight: 700,
-                            background: row.status === "BACKEND" ? "#dbeafe" : row.status === "DRAFT" ? "#fef3c7" : "#f1f5f9",
-                            color: row.status === "BACKEND" ? "#1e40af" : row.status === "DRAFT" ? "#92400e" : "#334155",
+                            background:
+                              row.status === "BACKEND"
+                                ? "#dbeafe"
+                                : row.status === "DRAFT"
+                                ? "#fef3c7"
+                                : "#f1f5f9",
+                            color:
+                              row.status === "BACKEND"
+                                ? "#1e40af"
+                                : row.status === "DRAFT"
+                                ? "#92400e"
+                                : "#334155",
                           }}
                         >
                           {row.status || "-"}
@@ -2888,8 +3338,14 @@ export default function DashboardPage({
                       <td
                         style={{
                           ...tdStyle,
-                          color: row.ticket_id_gamas && row.ticket_id_gamas !== "-" ? "#dc2626" : "#64748b",
-                          fontWeight: row.ticket_id_gamas && row.ticket_id_gamas !== "-" ? 700 : 400,
+                          color:
+                            row.ticket_id_gamas && row.ticket_id_gamas !== "-"
+                              ? "#dc2626"
+                              : "#64748b",
+                          fontWeight:
+                            row.ticket_id_gamas && row.ticket_id_gamas !== "-"
+                              ? 700
+                              : 400,
                         }}
                       >
                         {row.ticket_id_gamas || "-"}
@@ -2899,8 +3355,12 @@ export default function DashboardPage({
                       <td style={tdStyle}>{row.customer_type || "-"}</td>
                       <td style={tdStyle}>{row.customer_name || "-"}</td>
                       <td style={tdStyle}>{row.service_no || "-"}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{row.device_name || "-"}</td>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{row.rk_information || "-"}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        {row.device_name || "-"}
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        {row.rk_information || "-"}
+                      </td>
                       <td style={tdStyle}>
                         {row.urgency && row.urgency !== "-" ? (
                           <span
@@ -2920,7 +3380,12 @@ export default function DashboardPage({
                         )}
                       </td>
                       <td
-                        style={{ ...tdStyle, maxWidth: "240px", overflow: "hidden", textOverflow: "ellipsis" }}
+                        style={{
+                          ...tdStyle,
+                          maxWidth: "240px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
                         title={row.symptom}
                       >
                         {row.symptom || "-"}
@@ -2933,7 +3398,6 @@ export default function DashboardPage({
           </table>
         </div>
 
-        {/* BAR PAGINATION JIKA TIKET LEBIH DARI 50 */}
         {filteredData.length > 50 && (
           <div
             style={{
@@ -2946,14 +3410,15 @@ export default function DashboardPage({
             }}
           >
             <span>
-              Menampilkan <strong>{displayedRows.length}</strong> dari <strong>{filteredData.length}</strong> tiket
+              Menampilkan <strong>{displayedRows.length}</strong> dari{" "}
+              <strong>{filteredData.length}</strong> tiket
             </span>
             <button
               type="button"
               onClick={() => setShowAllRows((prev) => !prev)}
               style={{
                 background: "#f1f5f9",
-                color: "#1e3a8a",
+                color: accentColor,
                 border: "1px solid #cbd5e1",
                 padding: "4px 12px",
                 borderRadius: "6px",

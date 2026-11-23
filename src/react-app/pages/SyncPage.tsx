@@ -23,13 +23,19 @@ export default function SyncPage({
   const [previewTab, setPreviewTab] = useState<"MAIN" | "UNSPEC">("MAIN");
   const [search, setSearch] = useState("");
 
-  const buildBookmarklet = (endpointPath: string) => {
+  // Bookmarklet mendukung Multi-Page (>100 tiket) & terpisah per target endpoint:
+  // OK = Halaman 1 (Reset data lama & isi baru)
+  // Cancel = Halaman 2, 3, dst. (Append / gabungkan ke data sebelumnya tanpa menghapus halaman 1)
+  const buildBookmarklet = (endpointPath: string, targetLabel: string) => {
     const fullUrl = `${window.location.origin}${endpointPath}`;
-    return `javascript:(async()=>{const t=document.querySelector('table');if(!t)return alert('Tabel tidak ditemukan di halaman ini!');const h=[...t.querySelectorAll('thead th, tr:first-child th')].map(e=>e.innerText.replace(/\\s+/g,' ').trim().toUpperCase());const rows=[...t.querySelectorAll('tbody tr')].map(tr=>{const td=[...tr.querySelectorAll('td')];const o={};h.forEach((k,i)=>{if(k&&td[i])o[k]=td[i].innerText.replace(/\\s+/g,' ').trim()});return o}).filter(r=>r.INCIDENT&&r.INCIDENT.startsWith('INC'));if(!rows.length)return alert('Tidak ada baris tiket INC ditemukan.');try{const res=await fetch('${fullUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});const j=await res.json();alert(j.message||j.error)}catch(e){alert('Gagal mengirim data: '+e.message)}})();`;
+    return `javascript:(async()=>{const t=document.querySelector('table');if(!t)return alert('Tabel tidak ditemukan di halaman ini!');const h=[...t.querySelectorAll('thead th, tr:first-child th')].map(e=>e.innerText.replace(/\\s+/g,' ').trim().toUpperCase());const rows=[...t.querySelectorAll('tbody tr')].map(tr=>{const td=[...tr.querySelectorAll('td')];const o={};h.forEach((k,i)=>{if(k&&td[i])o[k]=td[i].innerText.replace(/\\s+/g,' ').trim()});return o}).filter(r=>r.INCIDENT&&r.INCIDENT.startsWith('INC'));if(!rows.length)return alert('Tidak ada baris tiket INC ditemukan.');const isFirst=confirm('[${targetLabel}] Ditemukan '+rows.length+' tiket di halaman ini.\\n\\n• Klik OK = Kirim sebagai HALAMAN 1 (Hapus data lama & mulai baru)\\n• Klik Cancel = Kirim sebagai HALAMAN 2 / 3 / dst. (Gabungkan ke data sebelumnya)');try{const res=await fetch('${fullUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:isFirst?1:2,mode:isFirst?'reset':'append',rows})});const j=await res.json();alert(j.message||j.error)}catch(e){alert('Gagal mengirim data: '+e.message)}})();`;
   };
 
-  const mainBookmarklet = buildBookmarklet("/api/ingest");
-  const unspecBookmarklet = buildBookmarklet("/api/unspec/ingest");
+  const mainBookmarklet = buildBookmarklet("/api/ingest", "TIKET GGN");
+  const unspecBookmarklet = buildBookmarklet(
+    "/api/unspec/ingest",
+    "UNSPEC INSERA"
+  );
 
   const handleCopyMain = () => {
     navigator.clipboard.writeText(mainBookmarklet);
@@ -85,11 +91,11 @@ export default function SyncPage({
             color: "#0f172a",
           }}
         >
-          Collect & Sinkronisasi Data (Terpisah Per Database)
+          Collect & Sinkronisasi Data (Terpisah Per Database & Multi-Page)
         </h1>
         <p style={{ color: "#64748b", fontSize: "13px", marginTop: "4px" }}>
-          Gunakan masing-masing Bookmarklet di bawah sesuai jenis halaman
-          portal yang sedang Anda buka agar data tidak pernah tertukar.
+          Mendukung penarikan data lebih dari 100 tiket (Page 1, 2, 3, dst.)
+          dengan dua Bookmarklet terpisah agar data tidak pernah tertukar.
         </p>
       </div>
 
@@ -123,7 +129,7 @@ export default function SyncPage({
             }}
           >
             <span style={{ fontWeight: 800, fontSize: "13.5px" }}>
-              1A. Bookmarklet: Dashboard KPI (Tiket Gangguan)
+              1A. Bookmarklet: Dashboard KPI (Multi-Page)
             </span>
             <span
               style={{
@@ -149,10 +155,8 @@ export default function SyncPage({
               }}
             >
               <li>
-                Klik tombol <strong>Copy Bookmarklet Tiket GGN</strong>.
-              </li>
-              <li>
-                Simpan sebagai bookmark di Chrome dengan nama{" "}
+                Klik <strong>Copy Bookmarklet Tiket GGN</strong>, lalu simpan
+                pada bookmark Chrome bernama{" "}
                 <code
                   style={{
                     background: "#eff6ff",
@@ -167,8 +171,13 @@ export default function SyncPage({
                 .
               </li>
               <li>
-                Jalankan khusus pada halaman daftar{" "}
-                <strong>Tiket Gangguan Reguler</strong>.
+                Di <strong>Halaman 1</strong> portal tiket, klik bookmark →
+                pilih <strong>OK</strong> (Reset & isi baru).
+              </li>
+              <li>
+                Jika ada <strong>Halaman 2, 3, dst.</strong>, pindah halaman,
+                klik bookmark lagi → pilih <strong>Cancel</strong> (Gabungkan
+                data).
               </li>
             </ol>
 
@@ -230,7 +239,7 @@ export default function SyncPage({
             }}
           >
             <span style={{ fontWeight: 800, fontSize: "13.5px" }}>
-              1B. Bookmarklet: Unspec Insera Controller
+              1B. Bookmarklet: Unspec Insera Controller (Multi-Page)
             </span>
             <span
               style={{
@@ -256,10 +265,8 @@ export default function SyncPage({
               }}
             >
               <li>
-                Klik tombol <strong>Copy Bookmarklet Unspec Insera</strong>.
-              </li>
-              <li>
-                Simpan sebagai bookmark terpisah di Chrome dengan nama{" "}
+                Klik <strong>Copy Bookmarklet Unspec Insera</strong>, lalu
+                simpan terpisah di Chrome bernama{" "}
                 <code
                   style={{
                     background: "#f0fdfa",
@@ -274,8 +281,13 @@ export default function SyncPage({
                 .
               </li>
               <li>
-                Jalankan khusus pada halaman{" "}
-                <strong>Unspec Insera Controller</strong>.
+                Di <strong>Halaman 1</strong> portal Unspec, klik bookmark →
+                pilih <strong>OK</strong> (Reset & isi baru).
+              </li>
+              <li>
+                Jika ada <strong>Halaman 2, 3, dst.</strong>, pindah halaman,
+                klik bookmark lagi → pilih <strong>Cancel</strong> (Gabungkan
+                data).
               </li>
             </ol>
 

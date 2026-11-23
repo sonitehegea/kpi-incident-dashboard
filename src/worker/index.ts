@@ -18,11 +18,12 @@ app.use(
   })
 );
 
-async function handleMirrorIngest(
+async function handleMultiPageIngest(
   db: D1Database,
   tableName: TargetTable,
   label: string,
-  parsedRows: Record<string, string>[]
+  parsedRows: Record<string, string>[],
+  mode: "reset" | "append" = "reset"
 ) {
   if (!Array.isArray(parsedRows) || parsedRows.length === 0) {
     return {
@@ -44,10 +45,12 @@ async function handleMirrorIngest(
     };
   }
 
-  const deleteStmt = db.prepare(`DELETE FROM ${tableName}`);
+  const isAppendMode = mode === "append";
 
+  // Jika mode reset (Page 1), hapus seluruh data lama terlebih dahulu.
+  // Jika mode append (Page 2, 3, dst.), pertahankan data sebelumnya & gunakan INSERT OR REPLACE.
   const insertStmt = db.prepare(`
-    INSERT INTO ${tableName} (
+    INSERT OR REPLACE INTO ${tableName} (
       incident, reported_date, booking_date, service_type, witel, workzone,
       status, status_date, ticket_id_gamas, contact_phone, contact_name,
       customer_type, customer_name, service_no, device_name, rk_information,
@@ -98,16 +101,31 @@ async function handleMirrorIngest(
     );
   });
 
-  await db.batch([deleteStmt, ...insertBatch.slice(0, 50)]);
+  if (!isAppendMode) {
+    const deleteStmt = db.prepare(`DELETE FROM ${tableName}`);
+    await db.batch([deleteStmt, ...insertBatch.slice(0, 50)]);
+  } else {
+    await db.batch(insertBatch.slice(0, 50));
+  }
 
   for (let i = 50; i < insertBatch.length; i += 50) {
     await db.batch(insertBatch.slice(i, i + 50));
   }
 
+  const countRes = await db
+    .prepare(`SELECT COUNT(*) as total FROM ${tableName}`)
+    .first<{ total: number }>();
+  const totalInDb = countRes?.total ?? validRows.length;
+
+  const message = isAppendMode
+    ? `[${label}] Berhasil menambahkan ${validRows.length} tiket (Page lanjutan). Total di database sekarang: ${totalInDb} tiket.`
+    : `[${label}] Sukses! Data lama di-reset & diisi ${validRows.length} tiket dari Halaman 1.`;
+
   return {
     ok: true as const,
     syncedCount: validRows.length,
-    message: `[${label}] Sukses! Data lama dibersihkan & diganti dengan ${validRows.length} tiket terbaru.`,
+    totalInDb,
+    message,
   };
 }
 
@@ -117,16 +135,20 @@ async function handleMirrorIngest(
 app.post("/api/ingest", async (c) => {
   try {
     const body = await c.req.json();
-    const res = await handleMirrorIngest(
+    const mode =
+      body.mode === "append" || Number(body.page) > 1 ? "append" : "reset";
+    const res = await handleMultiPageIngest(
       c.env.DB,
       "incidents",
       "TIKET GGN",
-      body.rows || []
+      body.rows || [],
+      mode
     );
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({
       success: true,
       syncedCount: res.syncedCount,
+      totalInDb: res.totalInDb,
       message: res.message,
     });
   } catch (err: any) {
@@ -159,16 +181,20 @@ app.get("/api/incidents", async (c) => {
 app.post("/api/unspec/ingest", async (c) => {
   try {
     const body = await c.req.json();
-    const res = await handleMirrorIngest(
+    const mode =
+      body.mode === "append" || Number(body.page) > 1 ? "append" : "reset";
+    const res = await handleMultiPageIngest(
       c.env.DB,
       "unspec_incidents",
       "UNSPEC INSERA",
-      body.rows || []
+      body.rows || [],
+      mode
     );
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({
       success: true,
       syncedCount: res.syncedCount,
+      totalInDb: res.totalInDb,
       message: res.message,
     });
   } catch (err: any) {

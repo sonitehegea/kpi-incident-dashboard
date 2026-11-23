@@ -1,7 +1,7 @@
 export interface Incident {
   incident: string;
   reported_date: string;
-  booking_date: string;
+  booking_date?: string;
   service_type: string;
   witel: string;
   workzone: string;
@@ -13,9 +13,19 @@ export interface Incident {
   customer_type: string;
   customer_name: string;
   service_no: string;
+  device_name?: string;
+  rk_information?: string;
+  urgency?: string;
   symptom: string;
-  device_name: string;
-  rk_information: string;
-  urgency: string;
-  synced_at: string;
+  summary?: string;
+  owner_group?: string;
+  owner?: string;
+  customer_segment?: string;
+  lapul?: number;
+  gaul?: number;
+  onu_rx?: string;
+  datemodified?: string;
+  technician?: string;
+  ttr_end_to_end?: string;
+  synced_at?: string;
 }

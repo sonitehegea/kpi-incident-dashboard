@@ -25,7 +25,11 @@ async function handleMirrorIngest(
   parsedRows: Record<string, string>[]
 ) {
   if (!Array.isArray(parsedRows) || parsedRows.length === 0) {
-    return { ok: false as const, status: 400 as const, error: `[${label}] Tidak ada data tiket yang dikirim.` };
+    return {
+      ok: false as const,
+      status: 400 as const,
+      error: `[${label}] Tidak ada data tiket yang dikirim.`,
+    };
   }
 
   const validRows = parsedRows.filter(
@@ -113,9 +117,18 @@ async function handleMirrorIngest(
 app.post("/api/ingest", async (c) => {
   try {
     const body = await c.req.json();
-    const res = await handleMirrorIngest(c.env.DB, "incidents", "TIKET GGN", body.rows || []);
+    const res = await handleMirrorIngest(
+      c.env.DB,
+      "incidents",
+      "TIKET GGN",
+      body.rows || []
+    );
     if (!res.ok) return c.json({ error: res.error }, res.status);
-    return c.json({ success: true, syncedCount: res.syncedCount, message: res.message });
+    return c.json({
+      success: true,
+      syncedCount: res.syncedCount,
+      message: res.message,
+    });
   } catch (err: any) {
     return c.json({ error: `[TIKET GGN] Ingest Error: ${err.message}` }, 500);
   }
@@ -133,7 +146,10 @@ app.get("/api/incidents", async (c) => {
       data: results,
     });
   } catch (err: any) {
-    return c.json({ error: `Gagal membaca database incidents: ${err.message}` }, 500);
+    return c.json(
+      { error: `Gagal membaca database incidents: ${err.message}` },
+      500
+    );
   }
 });
 
@@ -150,9 +166,16 @@ app.post("/api/unspec/ingest", async (c) => {
       body.rows || []
     );
     if (!res.ok) return c.json({ error: res.error }, res.status);
-    return c.json({ success: true, syncedCount: res.syncedCount, message: res.message });
+    return c.json({
+      success: true,
+      syncedCount: res.syncedCount,
+      message: res.message,
+    });
   } catch (err: any) {
-    return c.json({ error: `[UNSPEC INSERA] Ingest Error: ${err.message}` }, 500);
+    return c.json(
+      { error: `[UNSPEC INSERA] Ingest Error: ${err.message}` },
+      500
+    );
   }
 });
 
@@ -168,7 +191,10 @@ app.get("/api/unspec/incidents", async (c) => {
       data: results,
     });
   } catch (err: any) {
-    return c.json({ error: `Gagal membaca database unspec_incidents: ${err.message}` }, 500);
+    return c.json(
+      { error: `Gagal membaca database unspec_incidents: ${err.message}` },
+      500
+    );
   }
 });
 
